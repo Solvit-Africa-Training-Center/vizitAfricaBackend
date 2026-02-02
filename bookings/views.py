@@ -9,6 +9,10 @@ from rest_framework.decorators import api_view
 from tickets.models import Ticket
 from tickets.serializers import TicketSerializer
 from tickets.utils import generate_qr_code, generate_ticket_pdf
+from django.http import HttpResponse, Http404
+from django.core.files.storage import default_storage
+import os
+from django.utils import timezone
 
 
 class CreateBookingItemView(generics.CreateAPIView):
@@ -112,3 +116,76 @@ def generate_ticket(request, booking_id):
         
     except Booking.DoesNotExist:
         return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+@api_view(['GET'])
+def download_ticket(request, booking_id):
+    try:
+        booking = Booking.objects.get(id=booking_id, user=request.user)
+        
+        if not hasattr(booking, 'ticket'):
+            return Response({'error': 'No ticket found for this booking'}, status=status.HTTP_404_NOT_FOUND)
+        
+        ticket = booking.ticket
+        if not ticket.pdf_url:
+            return Response({'error': 'Ticket PDF not generated yet'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Extract file path from URL
+        pdf_path = ticket.pdf_url.split('/media/')[-1]
+        
+        if not default_storage.exists(pdf_path):
+            return Response({'error': 'Ticket file not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Serve the file
+        file_content = default_storage.open(pdf_path).read()
+        response = HttpResponse(file_content, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="ticket_{booking.id}.pdf"'
+        
+        return response
+        
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+def verify_ticket(request):
+    qr_data = request.data.get('qr_code_data')
+    
+    if not qr_data:
+        return Response({'error': 'QR code data required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        ticket = Ticket.objects.get(qr_code_data=qr_data)
+        
+        # Check if ticket is expired
+        from django.utils import timezone
+        if ticket.expires_at < timezone.now():
+            return Response({
+                'valid': False,
+                'message': 'Ticket has expired'
+            }, status=status.HTTP_200_OK)
+        
+        # Check booking status
+        if ticket.booking.status != 'confirmed':
+            return Response({
+                'valid': False,
+                'message': 'Booking not confirmed'
+            }, status=status.HTTP_200_OK)
+        
+        return Response({
+            'valid': True,
+            'ticket_id': ticket.id,
+            'booking_id': ticket.booking.id,
+            'user': ticket.booking.user.get_full_name() or ticket.booking.user.username,
+            'total_amount': ticket.booking.total_amount,
+            'currency': ticket.booking.currency,
+            'issued_at': ticket.issued_at,
+            'expires_at': ticket.expires_at
+        }, status=status.HTTP_200_OK)
+        
+    except Ticket.DoesNotExist:
+        return Response({
+            'valid': False,
+            'message': 'Invalid ticket'
+        }, status=status.HTTP_200_OK)
