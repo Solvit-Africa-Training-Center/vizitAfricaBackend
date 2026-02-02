@@ -13,6 +13,11 @@ from django.http import HttpResponse, Http404
 from django.core.files.storage import default_storage
 import os
 from django.utils import timezone
+#Transactions import
+from transactions.models import Transaction
+from transactions.serializers import TransactionSerializer
+from decimal import Decimal
+
 
 
 class CreateBookingItemView(generics.CreateAPIView):
@@ -189,3 +194,81 @@ def verify_ticket(request):
             'valid': False,
             'message': 'Invalid ticket'
         }, status=status.HTTP_200_OK)
+
+
+
+
+@api_view(['POST'])
+def process_commission(request, booking_id):
+    try:
+        booking = Booking.objects.get(id=booking_id, status='confirmed')
+        
+        # Check if commission already processed
+        if Transaction.objects.filter(booking=booking, transaction_type='commission').exists():
+            return Response({'message': 'Commission already processed'}, status=status.HTTP_200_OK)
+        
+        # Calculate commission (10% of total amount)
+        commission_rate = Decimal('0.10')
+        commission_amount = booking.total_amount * commission_rate
+        
+        # Create commission transaction
+        transaction = Transaction.objects.create(
+            booking=booking,
+            user=booking.user,
+            amount=commission_amount,
+            currency=booking.currency,
+            transaction_type='commission',
+            status='completed'
+        )
+        
+        serializer = TransactionSerializer(transaction)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+def transaction_history(request):
+    transactions = Transaction.objects.filter(user=request.user)
+    
+    # Filter by type if provided
+    transaction_type = request.query_params.get('type')
+    if transaction_type:
+        transactions = transactions.filter(transaction_type=transaction_type)
+    
+    serializer = TransactionSerializer(transactions, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+def process_refund(request, booking_id):
+    try:
+        booking = Booking.objects.get(id=booking_id, user=request.user)
+        
+        if booking.status != 'confirmed':
+            return Response({'error': 'Only confirmed bookings can be refunded'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if already refunded
+        if Transaction.objects.filter(booking=booking, transaction_type='refund').exists():
+            return Response({'error': 'Booking already refunded'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create refund transaction
+        transaction = Transaction.objects.create(
+            booking=booking,
+            user=booking.user,
+            amount=booking.total_amount,
+            currency=booking.currency,
+            transaction_type='refund',
+            status='pending'
+        )
+        
+        # Update booking status
+        booking.status = 'cancelled'
+        booking.save()
+        
+        serializer = TransactionSerializer(transaction)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
