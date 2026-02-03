@@ -272,3 +272,58 @@ def process_refund(request, booking_id):
         
     except Booking.DoesNotExist:
         return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+
+@api_view(['POST'])
+def process_payout(request, booking_id):
+    try:
+        booking = Booking.objects.get(id=booking_id, status='confirmed')
+        
+        # Get the service owner (vendor) from booking items
+        booking_items = booking.items.all()
+        if not booking_items.exists():
+            return Response({'error': 'No booking items found'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Assuming all items in a booking belong to the same vendor
+        vendor = booking_items.first().service.user
+        
+        # Check if payout already processed
+        if Transaction.objects.filter(booking=booking, transaction_type='payout').exists():
+            return Response({'message': 'Payout already processed'}, status=status.HTTP_200_OK)
+        
+        # Calculate payout (90% of total amount - after 10% commission)
+        commission_rate = Decimal('0.10')
+        payout_amount = booking.total_amount * (Decimal('1.00') - commission_rate)
+        
+        # Create payout transaction
+        transaction = Transaction.objects.create(
+            booking=booking,
+            user=vendor,  # Payout goes to vendor
+            amount=payout_amount,
+            currency=booking.currency,
+            transaction_type='payout',
+            status='completed'
+        )
+        
+        serializer = TransactionSerializer(transaction)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+def vendor_payouts(request):
+    """Get all payouts for the current vendor"""
+    payouts = Transaction.objects.filter(
+        user=request.user, 
+        transaction_type='payout'
+    )
+    
+    # Filter by status if provided
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        payouts = payouts.filter(status=status_filter)
+    
+    serializer = TransactionSerializer(payouts, many=True)
+    return Response(serializer.data)
