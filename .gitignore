@@ -26,7 +26,7 @@ env/
 *.pyo
 db.sqlite3
 media/
-staticfiles/
+# staticfiles/
 # Local media & static files
 # /static/
 /media/
