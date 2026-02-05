@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'tickets',
     'transactions',
     'vendors',
+    'locations',
 
     "drf_yasg",
 
