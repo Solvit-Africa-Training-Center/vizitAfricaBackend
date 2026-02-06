@@ -49,7 +49,7 @@ INSTALLED_APPS = [
     'vendors',
     'locations',
 
-    "drf_yasg",
+    "drf_spectacular",
 
     # Third-party
     'rest_framework',
@@ -99,7 +99,7 @@ WSGI_APPLICATION = 'vizitAfricaBackend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': config('DB_NAME'),
         'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASSWORD'),
@@ -154,6 +154,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT Configuration
