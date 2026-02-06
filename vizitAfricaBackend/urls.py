@@ -16,20 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
 from rest_framework import permissions
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
-schema_view = get_schema_view(
-   openapi.Info(
-      title="Vizit Africa API",
-      default_version='v1',
-      description="API documentation for Vizit Africa",
-   ),
-   public=True,
-   permission_classes=[permissions.AllowAny],
-)
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
