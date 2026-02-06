@@ -36,9 +36,9 @@ class UserManager(BaseUserManager):
 # USER MODEL
 # ===================================================
 class User(AbstractBaseUser, PermissionsMixin):
-    CLIENT = "client"
-    VENDOR = "vendor"
-    ADMIN = "admin"
+    CLIENT = "CLIENT"
+    VENDOR = "VENDOR"
+    ADMIN = "ADMIN"
 
     ROLE_CHOICES = [
         (CLIENT, "Client"),
