@@ -26,9 +26,9 @@ env/
 *.pyo
 db.sqlite3
 media/
-staticfiles/
+# staticfiles/
 # Local media & static files
-/static/
+# /static/
 /media/
 
 # ----------------------
@@ -50,3 +50,7 @@ staticfiles/
 # ----------------------
 .DS_Store
 Thumbs.db
+
+
+**/migrations/*
+!**/migrations/__init__.py
