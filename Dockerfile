@@ -16,9 +16,11 @@ RUN pip install --no-cache-dir gunicorn
 
 COPY . .
 
-# Create entrypoint script
+# Create entrypoint script that generates migrations
 RUN echo '#!/bin/bash\n\
 set -e\n\
+echo "Making migrations..."\n\
+python manage.py makemigrations --noinput\n\
 echo "Running migrations..."\n\
 python manage.py migrate --noinput\n\
 echo "Collecting static files..."\n\
