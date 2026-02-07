@@ -7,5 +7,8 @@ def send_verification_email(recipient_email, code):
     from_email = settings.EMAIL_HOST_USER
     recipient_list = [recipient_email]
 
-    # send_mail returns the number of successfully delivered messages (0 or 1)
-    return send_mail(subject, message, from_email, recipient_list)
+    try:
+        return send_mail(subject, message, from_email, recipient_list)
+    except Exception as e:
+        print(f"Email sending failed: {e}")
+        return 0
