@@ -104,8 +104,14 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT'),
+        'OPTIONS': {
+            'sslmode': 'require',  # Required for Aiven
+            'connect_timeout': 10,
+        },
+        'CONN_MAX_AGE': 0,  # Don't persist connections
     }
 }
+
 
 
 # Password validation
