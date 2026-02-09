@@ -5,7 +5,7 @@ from rest_framework import status
 
 from .services import cashin_payment, cashout_payment
 
-class CashInView(APIView):
+class payload(APIView):
     def post(self, request):
         amount = request.data.get("amount")
         phone = request.data.get("phone_number")
