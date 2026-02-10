@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: vizitafricabackend
+    env: python
+    region: oregon
+    plan: free
+    branch: dev
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn vizitAfricaBackend.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: http://localhost:3000

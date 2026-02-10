@@ -3,6 +3,7 @@ from django.conf import settings
 # from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from decimal import Decimal
+import uuid
 
 
 class BookingItem(models.Model):
@@ -13,6 +14,7 @@ class BookingItem(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='booking_items')
     service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='service_bookings')
     booking = models.ForeignKey('Booking', on_delete=models.CASCADE, null=True, blank=True, related_name='items')
@@ -44,6 +46,7 @@ class Booking(models.Model):
         ('completed', 'Completed'),
     ]
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bookings')
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default='USD')

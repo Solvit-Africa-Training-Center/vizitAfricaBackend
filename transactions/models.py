@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+import uuid
 
 class Transaction(models.Model):
     TRANSACTION_TYPES = [
@@ -14,6 +15,7 @@ class Transaction(models.Model):
         ('failed', 'Failed'),
     ]
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='transactions')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions')
     amount = models.DecimalField(max_digits=12, decimal_places=2)

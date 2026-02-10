@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+import uuid
 
 class Payment(models.Model):
     STATUS_CHOICES = [
@@ -9,6 +10,7 @@ class Payment(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='payments')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)

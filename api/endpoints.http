@@ -1,0 +1,226 @@
+
+
+
+###############################################
+# 1. AUTHENTICATION
+###############################################
+
+### Register User
+POST http://127.0.0.1:8000/api/accounts/users/
+Content-Type: application/json
+
+{
+  "full_name": "Ephasten Niyonizeye",
+  "email": "ephasteniyonizeye@gmail.com",
+  "phone_number": "0781234567",
+  "password": "Test1234!",
+  "re_password": "Test1234!",
+  "role": "CLIENT"
+}
+
+### Verify Email
+POST {{baseUrl}}/api/accounts/users/verify_email/
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "code": "123456"
+}
+
+### Login
+POST http://127.0.0.1:8000/api/accounts/login/
+Content-Type: application/json
+
+{
+  "email": "dontresor73@gmail.com",
+  "password": "ClientClient1"
+}
+
+
+# 2. VENDORS
+###############################################
+
+### Create Vendor Profile
+POST {{baseUrl}}/api/vendors/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "business_name": "Safari Adventures Ltd",
+  "vendor_type": "tour_operator"
+}
+
+### Approve Vendor (Admin Only)
+POST {{baseUrl}}/api/vendors/1/approve/
+Authorization: Bearer {{token}}
+
+###############################################
+# 3. LOCATIONS
+###############################################
+
+### Create Location
+POST {{baseUrl}}/api/locations/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Serengeti National Park",
+  "latitude": -2.333333,
+  "longitude": 34.833333
+}
+
+###############################################
+# 4. SERVICES
+###############################################
+
+### Create Service (Approved Vendor Only)
+POST http://127.0.0.1:8000/api/services/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzcwNjQ0OTQ0LCJpYXQiOjE3NzA2NDEzNDQsImp0aSI6Ijc3Y2E4ZTE0MDViMDQwMDdiNGM0YmE5MmM5MGNkNGQzIiwidXNlcl9pZCI6IjQ0YTFkNjE4LTllMDItNDMyNi1iYzlhLWQ5YTA3MDYzNzA3MSJ9.6W3NkfY-kPWoPUUv1M_SqrTRVvz2MSl18FfAYzboTXM
+Content-Type: application/json
+
+{
+  "title": "3-Day Safari Tour",
+  "service_type": "tour",
+  "description": "Experience the best of African wildlife",
+  "base_price": 500.00,
+  "currency": "USD",
+  "capacity": 10,
+  "status": "active",
+  "location": 1
+}
+
+###############################################
+# 5. SERVICE MEDIA
+###############################################
+
+### Add Service Media
+POST {{baseUrl}}/api/services/media/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "service": 1,
+  "media_url": "https://example.com/image.jpg",
+  "media_type": "image",
+  "sort_order": 1
+}
+
+###############################################
+# 6. SERVICE AVAILABILITY
+###############################################
+
+### Create Availability
+POST {{baseUrl}}/api/services/availability/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "service": 1,
+  "start_date": "2024-06-01",
+  "end_date": "2024-06-30",
+  "available_quantity": 10,
+  "price_override": 450.00,
+  "is_blocked": false
+}
+
+###############################################
+# 7. DISCOUNTS
+###############################################
+
+### Create Discount
+POST {{baseUrl}}/api/services/discounts/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "code": "SUMMER2024",
+  "name": "Summer Discount",
+  "description": "20% off all tours",
+  "discount_type": "percentage",
+  "discount_value": 20.00,
+  "start_date": "2024-06-01T00:00:00Z",
+  "end_date": "2024-08-31T23:59:59Z",
+  "is_active": true
+}
+
+###############################################
+# 8. BOOKING ITEMS (Cart)
+###############################################
+
+### Add Item to Cart
+POST http://127.0.0.1:8000/api/bookings/items/create/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzcwNjQ1NDUyLCJpYXQiOjE3NzA2NDE4NTIsImp0aSI6IjlmMTZlYjgzNDhkNDRiNTE5YTM0NmIzYjU2NWMzOWExIiwidXNlcl9pZCI6IjU2ZGIyODYwLWEwNmQtNDM0My1iYjhkLTM0MDE0NTJjOWNhNyJ9.iNeq7cHG0YmWHGL8C1F_IBA4So720AMtSxxOaJk6kt4
+Content-Type: application/json
+
+{
+  "service": 1,
+  "start_date": "2026-03-15",
+  "end_date": "2026-03-18",
+  "quantity": 2,
+  "unit_price": 1000
+}
+
+###############################################
+# 9. BOOKINGS
+###############################################
+
+### Confirm Booking
+POST {{baseUrl}}/api/bookings/confirm/
+Authorization: Bearer {{token}}
+
+###############################################
+# 10. PAYMENTS
+###############################################
+
+### Cash In (Deposit)
+POST {{baseUrl}}/api/payments/cashin/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amount": 1000,
+  "phone_number": "250781234567"
+}
+
+### Cash Out (Withdrawal)
+POST {{baseUrl}}/api/payments/cashout/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amount": 500,
+  "phone_number": "250781234567"
+}
+
+###############################################
+# 11. TICKETS
+###############################################
+
+### Generate Ticket
+POST {{baseUrl}}/api/bookings/1/generate-ticket/
+Authorization: Bearer {{token}}
+
+### Verify Ticket
+POST {{baseUrl}}/api/bookings/verify-ticket/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "qr_code_data": "VZT-1-1-user-id"
+}
+
+###############################################
+# 12. TRANSACTIONS
+###############################################
+
+### Process Commission
+POST {{baseUrl}}/api/bookings/1/commission/
+Authorization: Bearer {{token}}
+
+### Process Payout (Vendor)
+POST {{baseUrl}}/api/bookings/1/payout/
+Authorization: Bearer {{token}}
+
+### Process Refund
+POST {{baseUrl}}/api/bookings/1/refund/
+Authorization: Bearer {{token}}

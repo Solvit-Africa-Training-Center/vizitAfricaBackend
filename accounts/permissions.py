@@ -8,7 +8,7 @@ class IsAdmin(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == "admin"
+            and request.user.role == User.ADMIN
         )
 
 class IsVendor(BasePermission):
@@ -18,7 +18,7 @@ class IsVendor(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == "vendor"
+            and request.user.role == User.VENDOR
         )
 
 class IsTourist(BasePermission):
@@ -28,5 +28,5 @@ class IsTourist(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == "tourist"
+            and request.user.role == User.CLIENT
         )

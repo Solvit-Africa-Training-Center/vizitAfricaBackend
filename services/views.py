@@ -15,10 +15,20 @@ class ServiceViewSet(ModelViewSet):
     def get_queryset(self):
         if self.action == 'list' or self.action == 'retrieve':
             return Service.objects.filter(status='active')
-        return Service.objects.filter(user=self.request.user)
+            from accounts.models import User
+            user = self.request.user
+            if hasattr(user, 'role') and user.role == User.ADMIN:
+                return Service.objects.all()
+            return Service.objects.filter(user=user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+            from accounts.models import User
+            user = self.request.user
+            if hasattr(user, 'role') and user.role == User.ADMIN:
+                # Admin can create service for any vendor, must specify vendor/user
+                serializer.save()
+            else:
+                serializer.save(user=user)
 
 
 class ServiceMediaViewSet(ModelViewSet):

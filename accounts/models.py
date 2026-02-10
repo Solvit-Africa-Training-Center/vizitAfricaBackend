@@ -39,9 +39,9 @@ class UserManager(BaseUserManager):
 # USER MODEL
 # ===================================================
 class User(AbstractBaseUser, PermissionsMixin):
-    CLIENT = "client"
-    VENDOR = "vendor"
-    ADMIN = "admin"
+    CLIENT = "CLIENT"
+    VENDOR = "VENDOR"
+    ADMIN = "ADMIN"
 
     ROLE_CHOICES = [
         (CLIENT, "Client"),
@@ -82,7 +82,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["full_name"]
+    REQUIRED_FIELDS = ["full_name", "phone_number"]
 
     def __str__(self):
         return self.email

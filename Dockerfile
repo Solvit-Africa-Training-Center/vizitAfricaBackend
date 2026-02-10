@@ -16,15 +16,26 @@ RUN pip install --no-cache-dir gunicorn
 
 COPY . .
 
-RUN python manage.py collectstatic --noinput || echo "Collectstatic failed, continuing..."
-
-
-EXPOSE 8000
-
-CMD gunicorn --bind 0.0.0.0:${PORT:-8000} \
+# Create entrypoint script that generates migrations
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Making migrations..."\n\
+python manage.py makemigrations --noinput\n\
+echo "Running migrations..."\n\
+python manage.py migrate --noinput\n\
+echo "Collecting static files..."\n\
+python manage.py collectstatic --noinput\n\
+echo "Starting gunicorn..."\n\
+exec gunicorn --bind 0.0.0.0:${PORT:-8000} \
     --workers=1 \
     --threads=2 \
     --timeout=300 \
     --access-logfile - \
     --error-logfile - \
-    vizitAfricaBackend.wsgi:application
+    vizitAfricaBackend.wsgi:application' > /app/entrypoint.sh
+
+RUN chmod +x /app/entrypoint.sh
+
+EXPOSE 8000
+
+CMD ["/app/entrypoint.sh"]
