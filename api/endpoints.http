@@ -6,12 +6,12 @@
 ###############################################
 
 ### Register User
-POST {{baseUrl}}/api/accounts/users/
+POST http://127.0.0.1:8000/api/accounts/users/
 Content-Type: application/json
 
 {
-  "full_name": "John Doe",
-  "email": "john@example.com",
+  "full_name": "Ephasten Niyonizeye",
+  "email": "ephasteniyonizeye@gmail.com",
   "phone_number": "0781234567",
   "password": "Test1234!",
   "re_password": "Test1234!",
@@ -28,12 +28,12 @@ Content-Type: application/json
 }
 
 ### Login
-POST {{baseUrl}}/api/accounts/login/
+POST http://127.0.0.1:8000/api/accounts/login/
 Content-Type: application/json
 
 {
-  "email": "john@example.com",
-  "password": "Test1234!"
+  "email": "dontresor73@gmail.com",
+  "password": "ClientClient1"
 }
 
 
@@ -74,8 +74,8 @@ Content-Type: application/json
 ###############################################
 
 ### Create Service (Approved Vendor Only)
-POST {{baseUrl}}/api/services/
-Authorization: Bearer {{token}}
+POST http://127.0.0.1:8000/api/services/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzcwNjQ0OTQ0LCJpYXQiOjE3NzA2NDEzNDQsImp0aSI6Ijc3Y2E4ZTE0MDViMDQwMDdiNGM0YmE5MmM5MGNkNGQzIiwidXNlcl9pZCI6IjQ0YTFkNjE4LTllMDItNDMyNi1iYzlhLWQ5YTA3MDYzNzA3MSJ9.6W3NkfY-kPWoPUUv1M_SqrTRVvz2MSl18FfAYzboTXM
 Content-Type: application/json
 
 {
@@ -148,16 +148,16 @@ Content-Type: application/json
 ###############################################
 
 ### Add Item to Cart
-POST {{baseUrl}}/api/bookings/items/create/
-Authorization: Bearer {{token}}
+POST http://127.0.0.1:8000/api/bookings/items/create/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzcwNjQ1NDUyLCJpYXQiOjE3NzA2NDE4NTIsImp0aSI6IjlmMTZlYjgzNDhkNDRiNTE5YTM0NmIzYjU2NWMzOWExIiwidXNlcl9pZCI6IjU2ZGIyODYwLWEwNmQtNDM0My1iYjhkLTM0MDE0NTJjOWNhNyJ9.iNeq7cHG0YmWHGL8C1F_IBA4So720AMtSxxOaJk6kt4
 Content-Type: application/json
 
 {
   "service": 1,
-  "start_date": "2024-07-15",
-  "end_date": "2024-07-18",
+  "start_date": "2026-03-15",
+  "end_date": "2026-03-18",
   "quantity": 2,
-  "unit_price": 500.00
+  "unit_price": 1000
 }
 
 ###############################################
