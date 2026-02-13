@@ -7,7 +7,15 @@ class ServiceSerializer(ModelSerializer):
     class Meta:
         model = Service
         fields = "__all__"
-        read_only_fields = ['user', 'created_at']
+        read_only_fields = ['created_at']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            from accounts.models import User
+            if not (hasattr(request.user, 'role') and request.user.role == User.ADMIN):
+                self.fields['user'].read_only = True
 
 
 class ServiceMediaSerializer(ModelSerializer):
