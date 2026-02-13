@@ -14,9 +14,12 @@ class BookingItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['subtotal', 'created_at']
     
     def validate(self, data):
-        if data['start_date'] < date.today():
+        start_date = data.get('start_date') or (self.instance.start_date if self.instance else None)
+        end_date = data.get('end_date') or (self.instance.end_date if self.instance else None)
+        
+        if start_date and start_date < date.today():
             raise serializers.ValidationError("Start date cannot be in the past.")
-        if data['end_date'] < data['start_date']:
+        if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError("End date must be after start date.")
         return data
 

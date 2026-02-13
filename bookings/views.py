@@ -27,7 +27,7 @@ class CreateBookingItemView(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-class UpdateBookingItemView(generics.UpdateAPIView):
+class UpdateBookingItemView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BookingItemSerializer
     permission_classes = [IsAuthenticated]
     
@@ -81,7 +81,7 @@ class BookingListView(generics.ListAPIView):
     def get_queryset(self):
         return Booking.objects.filter(user=self.request.user)
 
-class BookingDetailView(generics.RetrieveAPIView):
+class BookingDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
     
