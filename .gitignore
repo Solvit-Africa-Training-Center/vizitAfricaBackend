@@ -5,6 +5,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+
+staticfiles/**
+static/**
+
 # ----------------------
 # Virtual Environment
 # ----------------------
