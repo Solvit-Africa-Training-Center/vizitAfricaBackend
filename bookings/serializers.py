@@ -31,3 +31,26 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = ['id', 'total_amount', 'currency', 'status', 'items', 'created_at', 'updated_at']
         read_only_fields = ['total_amount', 'created_at', 'updated_at']
+
+class TripSubmissionSerializer(serializers.Serializer):
+    
+    departureCity = serializers.CharField()
+    destination = serializers.CharField(required=False, allow_blank=True)
+    departureDate = serializers.DateField()
+    returnDate = serializers.DateField(required=False, allow_null=True)
+    adults = serializers.IntegerField()
+    children = serializers.IntegerField()
+    infants = serializers.IntegerField()
+    name = serializers.CharField()
+    email = serializers.EmailField()
+    phone = serializers.CharField()
+    tripPurpose = serializers.CharField()
+    specialRequests = serializers.CharField(required=False, allow_blank=True)
+    
+    
+    items = serializers.ListField(child=serializers.DictField())
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one item is required")
+        return value
