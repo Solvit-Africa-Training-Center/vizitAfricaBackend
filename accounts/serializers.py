@@ -33,7 +33,15 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             "password",
             "re_password",
         )
-        extra_kwargs = {"password": {"write_only": True}}
+        extra_kwargs = {
+            "password": {"write_only": True},
+            "role": {"read_only": True},
+        }
+
+    def validate_role(self, value):
+        if value == User.ADMIN:
+            raise serializers.ValidationError("Cannot register as admin.")
+        return value
 
     def validate(self, attrs):
         if attrs["password"] != attrs["re_password"]:

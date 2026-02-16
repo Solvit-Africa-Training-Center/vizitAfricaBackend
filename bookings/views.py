@@ -7,6 +7,10 @@ from .serializers import BookingItemSerializer, BookingSerializer, TripSubmissio
 # Tickets related imports
 from rest_framework.decorators import api_view
 from tickets.models import Ticket
+from accounts.utils.send_email import send_itinerary_email
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
 from tickets.serializers import TicketSerializer
 from tickets.utils import generate_qr_code, generate_ticket_pdf
 from django.http import HttpResponse, Http404
@@ -208,6 +212,11 @@ class TripSubmissionView(generics.CreateAPIView):
                     'is_active': True 
                 }
             )
+            # Update name if it's different and user was already there
+            if not created:
+                if data.get('name') and user.full_name != data.get('name'):
+                    user.full_name = data.get('name')
+                    user.save()
 
         # 4. Create Booking
         booking = Booking.objects.create(
@@ -228,7 +237,8 @@ class TripSubmissionView(generics.CreateAPIView):
             if item.get('type') == 'note':
                 continue
                 
-            external_id = item.get('id')
+            # Try 'service' first (standard for our frontend) then fallback to 'id'
+            external_id = item.get('service') or item.get('id')
             
             # Find Service by external_id
             service = Service.objects.filter(external_id=external_id).first()
@@ -275,8 +285,39 @@ class TripSubmissionView(generics.CreateAPIView):
         # 5. Update Total
         booking.total_amount = total
         booking.save()
-        
-        # 6. Return Response
+        # 6. Send Itinerary Email & Password Link
+        try:
+            # Prepare items for email summary
+            email_items = []
+            for item in items_data:
+                # Get service name if possible
+                service_id = item.get('service') or item.get('id')
+                svc = Service.objects.filter(external_id=service_id).first()
+                email_items.append({
+                    'title': svc.title if svc else item.get('title', 'Service'),
+                    'type': item.get('type', 'experience'),
+                    'description': svc.description if svc else item.get('description', ''),
+                    'price': item.get('price', 0)
+                })
+            
+            # Generate Password Link
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            
+            # Use the local/frontend URL for the password set page
+            # Assuming the frontend has a page to handle these params
+            password_link = f"http://localhost:3000/en/set-password?uidb64={uid}&token={token}"
+            
+            send_itinerary_email(
+                recipient_email=user.email,
+                guest_name=user.full_name,
+                items=email_items,
+                password_link=password_link
+            )
+        except Exception as e:
+            print(f"FAILED TO SEND EMAIL: {e}")
+
+        # 7. Return Response
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
