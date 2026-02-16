@@ -18,7 +18,13 @@ class VendorViewSet(ModelViewSet):
         return Vendor.objects.filter(user=self.request.user)
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user
+        from accounts.models import User
+        vendor_data = {'user': user}
+        if hasattr(user, 'role') and user.role == User.ADMIN:
+            vendor_data['is_approved'] = True
+            vendor_data['approved_by'] = user
+        serializer.save(**vendor_data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def approve(self, request, pk=None):
