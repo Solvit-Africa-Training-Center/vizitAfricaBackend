@@ -145,6 +145,12 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 print("EMAIL_HOST_USER =", EMAIL_HOST_USER)
 print("EMAIL_HOST_PASSWORD =", "SET" if EMAIL_HOST_PASSWORD != "NOT FOUND" else "NOT FOUND")
 
+# Frontend URL for email links
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
+
+# Admin email for trip request notifications
+ADMIN_EMAIL = config("ADMIN_EMAIL", default="dontresor922@gmail.com")
+
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 

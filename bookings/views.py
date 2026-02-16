@@ -7,7 +7,7 @@ from .serializers import BookingItemSerializer, BookingSerializer, TripSubmissio
 # Tickets related imports
 from rest_framework.decorators import api_view
 from tickets.models import Ticket
-from accounts.utils.send_email import send_itinerary_email
+from accounts.utils.send_email import send_itinerary_email, send_admin_trip_notification
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
@@ -313,6 +313,18 @@ class TripSubmissionView(generics.CreateAPIView):
                 guest_name=user.full_name,
                 items=email_items,
                 password_link=password_link
+            )
+            
+            # Send admin notification
+            send_admin_trip_notification(
+                guest_name=user.full_name,
+                guest_email=user.email,
+                booking_id=booking.id,
+                items=email_items,
+                trip_dates={
+                    'arrival': data['departureDate'].isoformat() if data.get('departureDate') else 'N/A',
+                    'departure': data.get('returnDate').isoformat() if data.get('returnDate') else 'N/A'
+                }
             )
         except Exception as e:
             print(f"FAILED TO SEND EMAIL: {e}")
