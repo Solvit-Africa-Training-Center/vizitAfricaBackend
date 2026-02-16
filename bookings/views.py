@@ -509,3 +509,14 @@ def vendor_payouts(request):
     
     serializer = TransactionSerializer(payouts, many=True)
     return Response(serializer.data)
+
+from accounts.permissions import IsAdmin
+from .serializers import AdminBookingSerializer
+
+class AdminBookingListView(generics.ListAPIView):
+    """
+    List all bookings for admin dashboard.
+    """
+    queryset = Booking.objects.all().order_by('-created_at')
+    serializer_class = AdminBookingSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
