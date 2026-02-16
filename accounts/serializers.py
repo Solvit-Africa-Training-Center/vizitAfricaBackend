@@ -4,6 +4,14 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from accounts.models import User, VerificationCode
 from accounts.utils.code_generator import generate_verification_code
 from accounts.utils.send_email import send_verification_email
+from google.oauth2 import id_token
+from google.auth.transport import requests
+from rest_framework import serializers
+from django.conf import settings
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from accounts.models import User
+
 
 
 # ===================================================
@@ -121,37 +129,49 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return data
 
-# ===================================================
-# PASSWORD SETTING (FOR GUESTS)
-# ===================================================
-from django.utils.http import urlsafe_base64_decode
-from django.contrib.auth.tokens import default_token_generator
-
-class SetPasswordSerializer(serializers.Serializer):
-    uidb64 = serializers.CharField()
+class GoogleLoginSerializer(serializers.Serializer):
     token = serializers.CharField()
-    password = serializers.CharField(write_only=True, min_length=8)
-    re_password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        if attrs["password"] != attrs["re_password"]:
-            raise serializers.ValidationError({"password": "Passwords do not match"})
-        
+        token = attrs.get("token")
+
         try:
-            uid = urlsafe_base64_decode(attrs['uidb64']).decode()
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            raise serializers.ValidationError({"uidb64": "Invalid user ID"})
+            idinfo = id_token.verify_oauth2_token(
+                token,
+                requests.Request(),
+                settings.GOOGLE_CLIENT_ID,
+            )
+        except Exception:
+            raise serializers.ValidationError("Invalid Google token")
 
-        if not default_token_generator.check_token(user, attrs['token']):
-            raise serializers.ValidationError({"token": "Invalid or expired token"})
+        email = idinfo.get("email")
+        full_name = idinfo.get("name")
 
-        attrs['user'] = user
-        return attrs
+        if not email:
+            raise serializers.ValidationError("Email not provided by Google")
 
-    def save(self):
-        user = self.validated_data['user']
-        user.set_password(self.validated_data['password'])
-        user.is_active = True  # Activate the guest account
-        user.save()
-        return user
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "full_name": full_name,
+                "is_active": True, 
+            },
+        )
+
+        if created:
+            user.set_unusable_password()
+            user.save()
+
+        refresh = RefreshToken.for_user(user)
+
+        return {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": user.role,
+            },
+        }
+
