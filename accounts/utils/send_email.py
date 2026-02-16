@@ -14,13 +14,15 @@ def send_verification_email(recipient_email, code):
     from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'DEFAULT_FROM_EMAIL', None) or 'noreply@vizit-africa.com'
     recipient_list = [recipient_email]
 
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
     verification_link = (
-        "https://vizit-africa.vercel.app/en/verify-email?"
+        f"{frontend_url}/en/verify-email?"
         f"email={quote_plus(str(recipient_email))}&token={quote_plus(str(code))}"
     )
 
     text_content = (
         f"Verify your Vizit Africa account by visiting the link below:\n\n{verification_link}\n\n"
+        f"Or enter this verification code: {code}\n\n"
         "If you did not request this, please ignore this email."
     )
 
@@ -45,7 +47,20 @@ def send_verification_email(recipient_email, code):
                                 <p style="color: #4B5563; font-size: 16px; line-height: 1.6; margin: 0 0 32px 0;">
                                     Welcome to Vizit Africa. To complete your registration and start planning your journey, please verify your email address.
                                 </p>
-                                <div style="margin: 32px 0;">
+                                
+                                <div style="background-color: #F9FAFB; border: 2px dashed #2D4685; border-radius: 8px; padding: 24px; margin: 32px 0; text-align: center;">
+                                    <p style="color: #6B7280; font-size: 14px; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Your Verification Code</p>
+                                    <div style="font-size: 36px; font-weight: 700; color: #2D4685; letter-spacing: 0.1em; font-family: 'Courier New', monospace; margin: 8px 0;">
+                                        {code}
+                                    </div>
+                                    <p style="color: #9CA3AF; font-size: 12px; margin: 12px 0 0 0;">Enter this code on the verification page</p>
+                                </div>
+                                
+                                <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 24px 0; text-align: center;">
+                                    Or click the button below to verify automatically
+                                </p>
+                                
+                                <div style="margin: 32px 0; text-align: center;">
                                     <a href="{verification_link}" style="background-color: #2D4685; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 4px; display: inline-block; font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Verify Email Address</a>
                                 </div>
                                 <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 32px 0 0 0; padding-top: 32px; border-top: 1px solid #F3F4F6;">
