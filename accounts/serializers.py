@@ -25,7 +25,15 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             "password",
             "re_password",
         )
-        extra_kwargs = {"password": {"write_only": True}}
+        extra_kwargs = {
+            "password": {"write_only": True},
+            "role": {"read_only": True},
+        }
+
+    def validate_role(self, value):
+        if value == User.ADMIN:
+            raise serializers.ValidationError("Cannot register as admin.")
+        return value
 
     def validate(self, attrs):
         if attrs["password"] != attrs["re_password"]:
@@ -112,3 +120,38 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         }
 
         return data
+
+# ===================================================
+# PASSWORD SETTING (FOR GUESTS)
+# ===================================================
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth.tokens import default_token_generator
+
+class SetPasswordSerializer(serializers.Serializer):
+    uidb64 = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    re_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["re_password"]:
+            raise serializers.ValidationError({"password": "Passwords do not match"})
+        
+        try:
+            uid = urlsafe_base64_decode(attrs['uidb64']).decode()
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError({"uidb64": "Invalid user ID"})
+
+        if not default_token_generator.check_token(user, attrs['token']):
+            raise serializers.ValidationError({"token": "Invalid or expired token"})
+
+        attrs['user'] = user
+        return attrs
+
+    def save(self):
+        user = self.validated_data['user']
+        user.set_password(self.validated_data['password'])
+        user.is_active = True  # Activate the guest account
+        user.save()
+        return user
