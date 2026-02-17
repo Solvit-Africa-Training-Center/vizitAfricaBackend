@@ -322,3 +322,71 @@ def send_admin_trip_notification(guest_name, guest_email, booking_id, items, tri
     except Exception as e:
         print(f"Admin notification email failed: {e}")
         return 0
+
+
+def send_client_quote_email(recipient_email, guest_name, booking_id, quote_items, total_amount, currency="USD"):
+    subject = f"Your Vizit Africa Quote #{booking_id}"
+    from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'DEFAULT_FROM_EMAIL', None) or 'noreply@vizit-africa.com'
+    recipient_list = [recipient_email]
+
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+    dashboard_link = f"{frontend_url}/en/profile"
+
+    rows_html = ""
+    for item in quote_items:
+        rows_html += f"""
+        <tr>
+            <td style="padding:10px;border-bottom:1px solid #E5E7EB;">{item.get('title', 'Service')}</td>
+            <td style="padding:10px;border-bottom:1px solid #E5E7EB;text-align:center;">{item.get('quantity', 1)}</td>
+            <td style="padding:10px;border-bottom:1px solid #E5E7EB;text-align:right;">{item.get('unit_price', 0)} {currency}</td>
+            <td style="padding:10px;border-bottom:1px solid #E5E7EB;text-align:right;font-weight:600;">{item.get('line_total', 0)} {currency}</td>
+        </tr>
+        """
+
+    text_content = (
+        f"Hello {guest_name},\n\n"
+        f"Your quote for booking {booking_id} is ready.\n"
+        f"Total: {total_amount} {currency}\n\n"
+        f"Open your dashboard: {dashboard_link}\n\n"
+        "Thank you for choosing Vizit Africa."
+    )
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html><body style="font-family:Arial,sans-serif;background:#F8F9FA;padding:24px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;margin:0 auto;background:#fff;border:1px solid #E5E7EB;">
+        <tr><td style="padding:24px;">
+          <h2 style="margin:0 0 12px 0;color:#111827;">Your Quote Is Ready</h2>
+          <p style="color:#374151;">Hello {guest_name}, your quote for booking <strong>{booking_id}</strong> is now available.</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;border:1px solid #E5E7EB;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#F9FAFB;">
+                <th style="padding:10px;text-align:left;">Service</th>
+                <th style="padding:10px;text-align:center;">Qty</th>
+                <th style="padding:10px;text-align:right;">Unit</th>
+                <th style="padding:10px;text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>{rows_html}</tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3" style="padding:12px;text-align:right;font-weight:700;">Grand Total</td>
+                <td style="padding:12px;text-align:right;font-weight:700;color:#2D4685;">{total_amount} {currency}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style="margin-top:24px;">
+            <a href="{dashboard_link}" style="display:inline-block;padding:12px 18px;background:#2D4685;color:white;text-decoration:none;">View in Dashboard</a>
+          </div>
+        </td></tr>
+      </table>
+    </body></html>
+    """
+
+    try:
+        msg = EmailMultiAlternatives(subject, text_content, from_email, recipient_list)
+        msg.attach_alternative(html_content, "text/html")
+        return msg.send()
+    except Exception as e:
+        print(f"Client quote email failed: {e}")
+        return 0
