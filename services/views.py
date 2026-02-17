@@ -25,8 +25,9 @@ class ServiceViewSet(ModelViewSet):
         from accounts.models import User
         user = self.request.user
         if hasattr(user, 'role') and user.role == User.ADMIN:
-            # Admin must specify the user/vendor in the request data
-            if 'user' not in serializer.validated_data:
+            # For admin requests, allow optional user and fallback to request user.
+            selected_user = serializer.validated_data.get('user')
+            if selected_user is None:
                 serializer.save(user=user)
             else:
                 serializer.save()

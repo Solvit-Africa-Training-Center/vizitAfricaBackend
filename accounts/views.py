@@ -58,6 +58,7 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def verify_email(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
@@ -74,6 +75,32 @@ class UserViewSet(viewsets.ModelViewSet):
 
         return Response(
             {"message": "Account activated successfully"},
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], permission_classes=[AllowAny])
+    def set_password(self, request):
+        from .serializers import SetPasswordSerializer
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        serializer = SetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response(
+            {
+                "message": "Password set successfully. You are now logged in.",
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "user": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "role": user.role,
+                }
+            },
             status=status.HTTP_200_OK,
         )
 

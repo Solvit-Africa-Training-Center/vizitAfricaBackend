@@ -41,6 +41,7 @@ class BookingItem(models.Model):
 class Booking(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('quoted', 'Quoted'),
         ('confirmed', 'Confirmed'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
@@ -53,9 +54,43 @@ class Booking(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    guest_info = models.JSONField(default=dict, blank=True)
     
     class Meta:
         ordering = ['-created_at']
     
+    def __str__(self):
+        return f"Booking {self.id} for {self.user.email} - {self.status}"
+    
     # def calculate_total(self):
     #     return sum(item.subtotal for item in self.items.all())
+
+class Package(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('sent', 'Sent'),
+        ('selected', 'Selected'),
+        ('paid', 'Paid'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='package')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    notes = models.TextField(blank=True, null=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Package for Booking {self.booking.id}"
+
+class PackageItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name='items')
+    service = models.ForeignKey('services.Service', on_delete=models.CASCADE)
+    price_override = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.service.title} in {self.package}"
