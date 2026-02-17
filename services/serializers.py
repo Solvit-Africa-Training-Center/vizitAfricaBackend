@@ -8,6 +8,9 @@ class ServiceSerializer(ModelSerializer):
         model = Service
         fields = "__all__"
         read_only_fields = ['created_at']
+        extra_kwargs = {
+            'user': {'required': False, 'allow_null': True}
+        }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
