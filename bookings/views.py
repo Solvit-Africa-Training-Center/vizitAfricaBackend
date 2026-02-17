@@ -1,13 +1,21 @@
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db import transaction
-from .models import BookingItem, Booking
-from .serializers import BookingItemSerializer, BookingSerializer, TripSubmissionSerializer
+from .models import BookingItem, Booking, Package, PackageItem
+from .serializers import (
+    BookingItemSerializer, BookingSerializer, TripSubmissionSerializer,
+    AdminBookingSerializer, PackageSerializer, PackageItemSerializer
+)
 # Tickets related imports
 from rest_framework.decorators import api_view
 from tickets.models import Ticket
-from accounts.utils.send_email import send_itinerary_email, send_admin_trip_notification
+from accounts.utils.send_email import (
+    send_itinerary_email,
+    send_admin_trip_notification,
+    send_client_quote_email,
+)
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
@@ -21,6 +29,54 @@ from django.utils import timezone
 from transactions.models import Transaction
 from transactions.serializers import TransactionSerializer
 from decimal import Decimal
+from datetime import date
+
+
+def _candidate_external_ids(raw_id, item_type):
+    if not raw_id:
+        return []
+
+    raw = str(raw_id).strip()
+    item_type = str(item_type or "").lower()
+    candidates = [raw]
+
+    if raw.startswith(("fl-", "ht-", "car-", "gd-")):
+        return candidates
+
+    if item_type == "flight" and raw.startswith("f"):
+        suffix = raw[1:]
+        if suffix.isdigit():
+            candidates.append(f"fl-{suffix}")
+    elif item_type in ["hotel", "accommodation"] and raw.startswith("h"):
+        suffix = raw[1:]
+        if suffix.isdigit():
+            candidates.append(f"ht-{suffix}")
+    elif item_type in ["car", "car_rental", "transport"] and raw.startswith("c"):
+        suffix = raw[1:]
+        if suffix.isdigit():
+            candidates.append(f"car-{suffix}")
+    elif item_type in ["guide", "experience", "tour"] and raw.startswith("g"):
+        suffix = raw[1:]
+        if suffix.isdigit():
+            candidates.append(f"gd-{suffix}")
+
+    return candidates
+
+
+def _resolve_service(item, Service):
+    external_id = item.get('service') or item.get('id')
+    item_type = item.get('type')
+
+    candidate_ids = _candidate_external_ids(external_id, item_type)
+    service = Service.objects.filter(external_id__in=candidate_ids).first()
+    if service:
+        return service
+
+    title = (item.get('title') or "").strip()
+    if title:
+        return Service.objects.filter(title__iexact=title).first()
+
+    return None
 
 
 
@@ -194,6 +250,23 @@ class TripSubmissionView(generics.CreateAPIView):
                 guest_info[k] = v
         
         items_data = data['items']
+
+        # Keep the original requested items so admins can build packages even
+        # when an item does not map to a Service.external_id yet.
+        guest_info['requestedItems'] = [
+            {
+                'id': item.get('id') or item.get('service'),
+                'service': item.get('service') or item.get('id'),
+                'type': item.get('type', 'service'),
+                'category': item.get('category', ''),
+                'title': item.get('title', 'Service'),
+                'description': item.get('description', ''),
+                'price': item.get('price', 0),
+                'quantity': item.get('quantity', 1),
+            }
+            for item in items_data
+            if item.get('type') != 'note'
+        ]
         
         # 3. Handle User (Authenticated or Guest)
         user = request.user if request.user.is_authenticated else None
@@ -237,11 +310,8 @@ class TripSubmissionView(generics.CreateAPIView):
             if item.get('type') == 'note':
                 continue
                 
-            # Try 'service' first (standard for our frontend) then fallback to 'id'
-            external_id = item.get('service') or item.get('id')
-            
-            # Find Service by external_id
-            service = Service.objects.filter(external_id=external_id).first()
+            # Resolve service using external_id aliases and title fallback.
+            service = _resolve_service(item, Service)
             
             if not service:
                
@@ -291,8 +361,7 @@ class TripSubmissionView(generics.CreateAPIView):
             email_items = []
             for item in items_data:
                 # Get service name if possible
-                service_id = item.get('service') or item.get('id')
-                svc = Service.objects.filter(external_id=service_id).first()
+                svc = _resolve_service(item, Service)
                 email_items.append({
                     'title': svc.title if svc else item.get('title', 'Service'),
                     'type': item.get('type', 'experience'),
@@ -509,3 +578,205 @@ def vendor_payouts(request):
     
     serializer = TransactionSerializer(payouts, many=True)
     return Response(serializer.data)
+
+from accounts.permissions import IsAdmin
+from .serializers import AdminBookingSerializer
+
+class AdminBookingListView(generics.ListAPIView):
+    """
+    List all bookings for admin dashboard.
+    """
+    queryset = Booking.objects.all().order_by('-created_at')
+    serializer_class = AdminBookingSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+class AdminBookingDetailView(generics.RetrieveAPIView):
+    """
+    Get detailed booking for admin.
+    """
+    queryset = Booking.objects.all()
+    serializer_class = AdminBookingSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+class PackageViewSet(viewsets.ModelViewSet):
+    """
+    Manage custom packages for bookings.
+    """
+    queryset = Package.objects.all()
+    serializer_class = PackageSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        booking_id = self.request.query_params.get('booking_id')
+        if booking_id:
+            return self.queryset.filter(booking_id=booking_id)
+        return self.queryset
+
+    @action(detail=True, methods=['post'])
+    def add_item(self, request, pk=None):
+        package = self.get_object()
+        serializer = PackageItemSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(package=package)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class PackageItemViewSet(viewsets.ModelViewSet):
+    queryset = PackageItem.objects.all()
+    serializer_class = PackageItemSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+
+@api_view(['POST'])
+def send_quote(request, booking_id):
+    if not (request.user and request.user.is_authenticated and getattr(request.user, "role", "") == "ADMIN"):
+        return Response({'error': 'Only admin can send quotes'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        booking = Booking.objects.get(id=booking_id)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    items = request.data.get('items') or []
+    if not isinstance(items, list) or len(items) == 0:
+        return Response({'error': 'Quote items are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    currency = request.data.get('currency') or booking.currency or 'USD'
+    notes = request.data.get('notes', '')
+    expires_at = request.data.get('expires_at')
+
+    normalized_items = []
+    grand_total = Decimal('0.00')
+
+    for item in items:
+        title = item.get('title') or 'Service'
+        item_type = item.get('type') or 'service'
+        quantity = int(item.get('quantity') or 1)
+        unit_price = Decimal(str(item.get('unit_price') or 0))
+        line_total = unit_price * quantity
+        grand_total += line_total
+
+        normalized_items.append({
+            'id': item.get('id'),
+            'service': item.get('service'),
+            'type': item_type,
+            'title': title,
+            'description': item.get('description', ''),
+            'quantity': quantity,
+            'unit_price': float(unit_price),
+            'line_total': float(line_total),
+        })
+
+    guest_info = dict(booking.guest_info or {})
+    guest_info['packageQuote'] = {
+        'status': 'quoted',
+        'sent_at': timezone.now().isoformat(),
+        'sent_by': str(request.user.id),
+        'currency': currency,
+        'total_amount': float(grand_total),
+        'notes': notes,
+        'expires_at': expires_at,
+        'items': normalized_items,
+    }
+    booking.guest_info = guest_info
+    booking.total_amount = grand_total
+    booking.status = 'quoted'
+    booking.save(update_fields=['guest_info', 'total_amount', 'status', 'updated_at'])
+
+    recipient_email = guest_info.get('email') or booking.user.email
+    recipient_name = guest_info.get('name') or booking.user.full_name
+
+    try:
+        send_client_quote_email(
+            recipient_email=recipient_email,
+            guest_name=recipient_name,
+            booking_id=booking.id,
+            quote_items=normalized_items,
+            total_amount=float(grand_total),
+            currency=currency,
+        )
+    except Exception:
+        # Quote persistence must succeed even if email transport fails.
+        pass
+
+    return Response({
+        'message': 'Quote sent successfully',
+        'booking_id': str(booking.id),
+        'total_amount': float(grand_total),
+        'currency': currency,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def accept_quote(request, booking_id):
+    try:
+        booking = Booking.objects.get(id=booking_id, user=request.user)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    guest_info = dict(booking.guest_info or {})
+    quote = guest_info.get('packageQuote')
+    if not isinstance(quote, dict):
+        return Response({'error': 'No quote found for this booking'}, status=status.HTTP_400_BAD_REQUEST)
+
+    quote_status = str(quote.get('status', '')).lower()
+    if quote_status not in ['quoted', 'sent']:
+        return Response({'error': 'This quote is not available for acceptance'}, status=status.HTTP_400_BAD_REQUEST)
+
+    quote['status'] = 'accepted'
+    quote['accepted_at'] = timezone.now().isoformat()
+    quote['accepted_by'] = str(request.user.id)
+    guest_info['packageQuote'] = quote
+
+    quote_total = quote.get('total_amount')
+    if quote_total is not None:
+        booking.total_amount = Decimal(str(quote_total))
+
+    booking.guest_info = guest_info
+    booking.status = 'confirmed'
+    booking.save(update_fields=['guest_info', 'status', 'total_amount', 'updated_at'])
+
+    # If no booking items exist, try to materialize quoted services into BookingItem rows.
+    if not booking.items.exists():
+        from services.models import Service
+
+        start_date_raw = guest_info.get('departureDate')
+        end_date_raw = guest_info.get('returnDate') or start_date_raw
+        try:
+            start_date = date.fromisoformat(start_date_raw) if start_date_raw else timezone.now().date()
+        except Exception:
+            start_date = timezone.now().date()
+        try:
+            end_date = date.fromisoformat(end_date_raw) if end_date_raw else start_date
+        except Exception:
+            end_date = start_date
+
+        for quote_item in quote.get('items', []):
+            service = None
+            service_ref = quote_item.get('service') or quote_item.get('id')
+            if service_ref:
+                service = Service.objects.filter(external_id=str(service_ref)).first()
+            if not service and quote_item.get('title'):
+                service = Service.objects.filter(title__iexact=quote_item.get('title')).first()
+            if not service:
+                continue
+
+            quantity = int(quote_item.get('quantity') or 1)
+            unit_price = Decimal(str(quote_item.get('unit_price') or service.base_price or 0))
+            BookingItem.objects.create(
+                booking=booking,
+                service=service,
+                user=request.user,
+                start_date=start_date,
+                end_date=end_date,
+                quantity=quantity,
+                unit_price=unit_price,
+                subtotal=unit_price * quantity,
+                status='booked',
+            )
+
+    return Response({
+        'message': 'Quote accepted successfully',
+        'booking_id': str(booking.id),
+        'status': booking.status,
+    }, status=status.HTTP_200_OK)
