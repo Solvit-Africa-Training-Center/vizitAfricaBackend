@@ -104,7 +104,7 @@ DATABASES = {
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT'),
         'OPTIONS': {
-            'sslmode': 'require',  # Required for Aiven
+            'sslmode': config('DB_SSLMODE', default='require'),
             'connect_timeout': 10,
         },
         'CONN_MAX_AGE': 0,  # Don't persist connections
@@ -141,9 +141,9 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="NOT FOUND")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="NOT FOUND")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-# 🔹 Test print
-print("EMAIL_HOST_USER =", EMAIL_HOST_USER)
-print("EMAIL_HOST_PASSWORD =", "SET" if EMAIL_HOST_PASSWORD != "NOT FOUND" else "NOT FOUND")
+# Credentials should not be printed in production
+# print("EMAIL_HOST_USER =", EMAIL_HOST_USER)
+# print("EMAIL_HOST_PASSWORD =", "SET" if EMAIL_HOST_PASSWORD != "NOT FOUND" else "NOT FOUND")
 
 # Frontend URL for email links
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
@@ -195,7 +195,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # ENV~
@@ -212,7 +220,7 @@ CORS_ALLOWED_METHODS = [
     "DELETE",      
 ]
 
-CORS_ALLOWS_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True
 
 # Security Settings for Production
 if not DEBUG:

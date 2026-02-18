@@ -13,7 +13,8 @@ class VendorViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsVendorOwner]
 
     def get_queryset(self):
-        if self.request.user and self.request.user.role == 'admin':
+        from accounts.models import User
+        if self.request.user and hasattr(self.request.user, 'role') and self.request.user.role == User.ADMIN:
             return Vendor.objects.all()
         return Vendor.objects.filter(user=self.request.user)
     
@@ -26,7 +27,8 @@ class VendorViewSet(ModelViewSet):
             vendor_data['approved_by'] = user
         serializer.save(**vendor_data)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    from accounts.permissions import IsAdmin
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdmin])
     def approve(self, request, pk=None):
         vendor = self.get_object()
         vendor.is_approved = True

@@ -8,10 +8,16 @@ class BookingItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = BookingItem
         fields = [
-            'id', 'service', 'start_date', 'end_date', 'quantity', 
-            'unit_price', 'subtotal', 'status', 'created_at'
+            'id', 'service', 'item_type', 'title', 'description', 
+            'start_date', 'end_date', 'quantity', 
+            'unit_price', 'subtotal', 'status', 'metadata', 'created_at'
         ]
         read_only_fields = ['subtotal', 'created_at']
+        extra_kwargs = {
+            'service': {'required': False, 'allow_null': True},
+            'start_date': {'required': False, 'allow_null': True},
+            'end_date': {'required': False, 'allow_null': True},
+        }
     
     def validate(self, data):
         start_date = data.get('start_date') or (self.instance.start_date if self.instance else None)
@@ -65,7 +71,11 @@ class AdminBookingItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = BookingItem
-        fields = ['id', 'service', 'start_date', 'end_date', 'quantity', 'unit_price', 'subtotal', 'service_details']
+        fields = [
+            'id', 'service', 'item_type', 'title', 'description', 
+            'start_date', 'end_date', 'quantity', 'unit_price', 'subtotal', 
+            'metadata', 'service_details'
+        ]
         read_only_fields = ['subtotal']
     
     def get_service_details(self, obj):

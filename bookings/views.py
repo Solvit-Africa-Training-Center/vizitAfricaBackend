@@ -269,27 +269,32 @@ class TripSubmissionView(generics.CreateAPIView):
         ]
         
         # 3. Handle User (Authenticated or Guest)
-        user = request.user if request.user.is_authenticated else None
-        
-        if not user:
-            email = data.get('email')
-            if not email:
-                return Response({'error': 'Email is required for guest checkout'}, status=status.HTTP_400_BAD_REQUEST)
+        email = data.get('email')
+        if not email:
+             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Security: If user exists, requester MUST be that user
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user:
+            if not request.user.is_authenticated or request.user.email != email:
+                 return Response(
+                     {"error": "User with this email already exists. Please login to continue."}, 
+                     status=status.HTTP_403_FORBIDDEN
+                 )
+            user = existing_user
             
-            from accounts.models import User
-            user, created = User.objects.get_or_create(
+            # Update name if provided and allowed? 
+            # For now let's not auto-update established profiles from a guest form.
+        else:
+            # Create new GUEST/INACTIVE user
+            user = User.objects.create(
                 email=email,
-                defaults={
-                    'full_name': data.get('name', 'Guest User'),
-                    'role': 'CLIENT',
-                    'is_active': True 
-                }
+                full_name=data.get('name', 'Guest'),
+                role='CLIENT',
+                is_active=False  # Must verify email first
             )
-            # Update name if it's different and user was already there
-            if not created:
-                if data.get('name') and user.full_name != data.get('name'):
-                    user.full_name = data.get('name')
-                    user.save()
+            user.set_unusable_password()
+            user.save()
 
         # 4. Create Booking
         booking = Booking.objects.create(
@@ -302,7 +307,7 @@ class TripSubmissionView(generics.CreateAPIView):
         
         total = Decimal('0.00')
         
-        # 4. Process Items
+        # 5. Process Items
         from services.models import Service
         
         for item in items_data:
@@ -313,49 +318,32 @@ class TripSubmissionView(generics.CreateAPIView):
             # Resolve service using external_id aliases and title fallback.
             service = _resolve_service(item, Service)
             
-            if not service:
-               
-                
-                
-                if item.get('type') == 'flight':
-                    
-                    pass # Logic to handle missing flights if dynamic
-                
-                if not service:
-                     
-                     
-                     if item.get('type') == 'flight':
-                         
-                         continue 
-
-            
-            
             unit_price = service.base_price if service else Decimal(str(item.get('price', 0)))
             quantity = item.get('quantity', 1)
             
             # Dates
-            start_date = data['departureDate']
+            start_date = data.get('departureDate')
             end_date = data.get('returnDate') or start_date
             
             # Create Item
-            if service:
-                booking_item = BookingItem.objects.create(
-                    booking=booking,
-                    service=service,
-                    user=user,
-                    start_date=start_date,
-                    end_date=end_date,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    subtotal=unit_price * quantity,
-                    status='reserved'
-                )
-                total += booking_item.subtotal
+            booking_item = BookingItem.objects.create(
+                booking=booking,
+                service=service,
+                user=user,
+                start_date=start_date,
+                end_date=end_date,
+                quantity=quantity,
+                unit_price=unit_price,
+                subtotal=unit_price * quantity,
+                status='reserved'
+            )
+            total += booking_item.subtotal
 
-        # 5. Update Total
+        # 6. Update Total
         booking.total_amount = total
         booking.save()
-        # 6. Send Itinerary Email & Password Link
+
+        # 7. Send Itinerary Email & Password Link
         try:
             # Prepare items for email summary
             email_items = []
@@ -373,9 +361,10 @@ class TripSubmissionView(generics.CreateAPIView):
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
             
-            # Use the local/frontend URL for the password set page
-            # Assuming the frontend has a page to handle these params
-            password_link = f"http://localhost:3000/en/set-password?uidb64={uid}&token={token}"
+            # Use configured frontend URL
+            from django.conf import settings
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+            password_link = f"{frontend_url}/en/set-password?uidb64={uid}&token={token}"
             
             send_itinerary_email(
                 recipient_email=user.email,
@@ -398,7 +387,7 @@ class TripSubmissionView(generics.CreateAPIView):
         except Exception as e:
             print(f"FAILED TO SEND EMAIL: {e}")
 
-        # 7. Return Response
+        # 8. Return Response
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -431,7 +420,7 @@ def verify_ticket(request):
             'valid': True,
             'ticket_id': ticket.id,
             'booking_id': ticket.booking.id,
-            'user': ticket.booking.user.get_full_name() or ticket.booking.user.username,
+            'user': ticket.booking.user.full_name or ticket.booking.user.email,
             'total_amount': ticket.booking.total_amount,
             'currency': ticket.booking.currency,
             'issued_at': ticket.issued_at,
@@ -637,74 +626,45 @@ def send_quote(request, booking_id):
     except Booking.DoesNotExist:
         return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    items = request.data.get('items') or []
-    if not isinstance(items, list) or len(items) == 0:
-        return Response({'error': 'Quote items are required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    currency = request.data.get('currency') or booking.currency or 'USD'
-    notes = request.data.get('notes', '')
-    expires_at = request.data.get('expires_at')
-
-    normalized_items = []
-    grand_total = Decimal('0.00')
-
-    for item in items:
-        title = item.get('title') or 'Service'
-        item_type = item.get('type') or 'service'
-        quantity = int(item.get('quantity') or 1)
-        unit_price = Decimal(str(item.get('unit_price') or 0))
-        line_total = unit_price * quantity
-        grand_total += line_total
-
-        normalized_items.append({
-            'id': item.get('id'),
-            'service': item.get('service'),
-            'type': item_type,
-            'title': title,
-            'description': item.get('description', ''),
-            'quantity': quantity,
-            'unit_price': float(unit_price),
-            'line_total': float(line_total),
-        })
-
-    guest_info = dict(booking.guest_info or {})
-    guest_info['packageQuote'] = {
-        'status': 'quoted',
-        'sent_at': timezone.now().isoformat(),
-        'sent_by': str(request.user.id),
-        'currency': currency,
-        'total_amount': float(grand_total),
-        'notes': notes,
-        'expires_at': expires_at,
-        'items': normalized_items,
-    }
-    booking.guest_info = guest_info
-    booking.total_amount = grand_total
-    booking.status = 'quoted'
-    booking.save(update_fields=['guest_info', 'total_amount', 'status', 'updated_at'])
-
-    recipient_email = guest_info.get('email') or booking.user.email
-    recipient_name = guest_info.get('name') or booking.user.full_name
+    items = request.data.get('items')
+    if not items or not isinstance(items, list):
+         return Response({'error': 'Items list is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        send_client_quote_email(
-            recipient_email=recipient_email,
-            guest_name=recipient_name,
-            booking_id=booking.id,
-            quote_items=normalized_items,
-            total_amount=float(grand_total),
-            currency=currency,
-        )
-    except Exception:
-        # Quote persistence must succeed even if email transport fails.
-        pass
+        from .services import QuoteService, NotificationService
+        
+        # 1. Generate Quote
+        updated_booking = QuoteService.generate_quote(booking, items, request.user)
+        
+        # 2. Send Email
+        try:
+             # Re-using legacy email function for now, or move to NotificationService
+             # Extract structured items for email template
+             quote_data = updated_booking.guest_info.get('packageQuote')
+             recipient_email = updated_booking.guest_info.get('email') or updated_booking.user.email
+             recipient_name = updated_booking.guest_info.get('name') or updated_booking.user.full_name
+             
+             send_client_quote_email(
+                recipient_email=recipient_email,
+                guest_name=recipient_name,
+                booking_id=updated_booking.id,
+                quote_items=quote_data.get('items', []),
+                total_amount=quote_data.get('total_amount'),
+                currency=quote_data.get('currency'),
+            )
+        except Exception as e:
+            print(f"Email sending failed: {e}")
+            # Non-blocking
+            
+        return Response({
+            'message': 'Quote sent successfully',
+            'booking_id': str(updated_booking.id),
+            'total_amount': updated_booking.total_amount,
+            'currency': updated_booking.currency,
+        }, status=status.HTTP_200_OK)
 
-    return Response({
-        'message': 'Quote sent successfully',
-        'booking_id': str(booking.id),
-        'total_amount': float(grand_total),
-        'currency': currency,
-    }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -714,69 +674,19 @@ def accept_quote(request, booking_id):
     except Booking.DoesNotExist:
         return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    guest_info = dict(booking.guest_info or {})
-    quote = guest_info.get('packageQuote')
-    if not isinstance(quote, dict):
-        return Response({'error': 'No quote found for this booking'}, status=status.HTTP_400_BAD_REQUEST)
-
-    quote_status = str(quote.get('status', '')).lower()
-    if quote_status not in ['quoted', 'sent']:
-        return Response({'error': 'This quote is not available for acceptance'}, status=status.HTTP_400_BAD_REQUEST)
-
-    quote['status'] = 'accepted'
-    quote['accepted_at'] = timezone.now().isoformat()
-    quote['accepted_by'] = str(request.user.id)
-    guest_info['packageQuote'] = quote
-
-    quote_total = quote.get('total_amount')
-    if quote_total is not None:
-        booking.total_amount = Decimal(str(quote_total))
-
-    booking.guest_info = guest_info
-    booking.status = 'confirmed'
-    booking.save(update_fields=['guest_info', 'status', 'total_amount', 'updated_at'])
-
-    # If no booking items exist, try to materialize quoted services into BookingItem rows.
-    if not booking.items.exists():
-        from services.models import Service
-
-        start_date_raw = guest_info.get('departureDate')
-        end_date_raw = guest_info.get('returnDate') or start_date_raw
-        try:
-            start_date = date.fromisoformat(start_date_raw) if start_date_raw else timezone.now().date()
-        except Exception:
-            start_date = timezone.now().date()
-        try:
-            end_date = date.fromisoformat(end_date_raw) if end_date_raw else start_date
-        except Exception:
-            end_date = start_date
-
-        for quote_item in quote.get('items', []):
-            service = None
-            service_ref = quote_item.get('service') or quote_item.get('id')
-            if service_ref:
-                service = Service.objects.filter(external_id=str(service_ref)).first()
-            if not service and quote_item.get('title'):
-                service = Service.objects.filter(title__iexact=quote_item.get('title')).first()
-            if not service:
-                continue
-
-            quantity = int(quote_item.get('quantity') or 1)
-            unit_price = Decimal(str(quote_item.get('unit_price') or service.base_price or 0))
-            BookingItem.objects.create(
-                booking=booking,
-                service=service,
-                user=request.user,
-                start_date=start_date,
-                end_date=end_date,
-                quantity=quantity,
-                unit_price=unit_price,
-                subtotal=unit_price * quantity,
-                status='booked',
-            )
-
-    return Response({
-        'message': 'Quote accepted successfully',
-        'booking_id': str(booking.id),
-        'status': booking.status,
-    }, status=status.HTTP_200_OK)
+    try:
+        from .services import BookingService
+        
+        # Confirm booking via service
+        confirmed_booking = BookingService.confirm_booking(booking)
+        
+        return Response({
+            'message': 'Quote accepted and booking confirmed',
+            'booking_id': str(confirmed_booking.id),
+            'status': confirmed_booking.status,
+        }, status=status.HTTP_200_OK)
+        
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': f"Failed to confirm booking: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

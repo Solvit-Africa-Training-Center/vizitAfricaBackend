@@ -41,7 +41,10 @@ urlpatterns = [
     # Admin
     path('admin/bookings/', AdminBookingListView.as_view(), name='admin-bookings-list'),
     path('admin/bookings/<uuid:pk>/', AdminBookingDetailView.as_view(), name='admin-booking-detail'),
-    path('admin/bookings/<uuid:booking_id>/send-quote/', send_quote, name='admin-booking-send-quote'),
-    path('<uuid:booking_id>/accept-quote/', accept_quote, name='booking-accept-quote'),
+    
+    # RESTful Quote Management
+    path('<uuid:booking_id>/quote/', send_quote, name='manage-quote'),
+    path('<uuid:booking_id>/accept/', accept_quote, name='accept-quote'),
+
     path('', include(router.urls)),
 ]

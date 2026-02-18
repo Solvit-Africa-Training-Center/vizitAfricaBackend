@@ -16,10 +16,24 @@ class BookingItem(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='booking_items')
-    service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='service_bookings')
+    service = models.ForeignKey('services.Service', on_delete=models.CASCADE, related_name='service_bookings', null=True, blank=True)
     booking = models.ForeignKey('Booking', on_delete=models.CASCADE, null=True, blank=True, related_name='items')
-    start_date = models.DateField()
-    end_date = models.DateField()
+    
+    # Flexible Item Fields
+    item_type = models.CharField(max_length=50, choices=[
+        ('flight', 'Flight'),
+        ('hotel', 'Hotel'),
+        ('car', 'Car'),
+        ('activity', 'Activity'),
+        ('custom', 'Custom'),
+        ('service', 'Service')
+    ], default='service')
+    title = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
@@ -31,12 +45,9 @@ class BookingItem(models.Model):
         ordering = ['-created_at']
     
     def save(self, *args, **kwargs):
-        try:
-            if self.unit_price and self.quantity:
-                self.subtotal = self.unit_price * self.quantity
-            super().save(*args, **kwargs)
-        except Exception as e:
-            raise ValueError(f"Error saving booking item: {str(e)}")
+        if self.unit_price and self.quantity:
+            self.subtotal = self.unit_price * self.quantity
+        super().save(*args, **kwargs)
 
 class Booking(models.Model):
     STATUS_CHOICES = [

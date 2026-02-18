@@ -154,6 +154,7 @@ class GoogleLoginSerializer(serializers.Serializer):
             email=email,
             defaults={
                 "full_name": full_name,
+                "phone_number": "",  # Placeholder, user should update profile
                 "is_active": True, 
             },
         )
