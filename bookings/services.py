@@ -101,3 +101,91 @@ class BookingService:
         booking.save()
         
         return booking
+
+
+from transactions.models import Transaction
+
+class FinancialService:
+    COMMISSION_RATE = Decimal('0.10')
+
+    @staticmethod
+    def process_commission(booking):
+        """
+        Calculate and create commission transaction for a confirmed booking.
+        """
+        if booking.status != 'confirmed':
+            raise ValueError("Commission can only be processed for confirmed bookings")
+            
+        if Transaction.objects.filter(booking=booking, transaction_type='commission').exists():
+            return None # Already processed
+            
+        commission_amount = booking.total_amount * FinancialService.COMMISSION_RATE
+        
+        return Transaction.objects.create(
+            booking=booking,
+            user=booking.user,
+            amount=commission_amount,
+            currency=booking.currency,
+            transaction_type='commission',
+            status='completed'
+        )
+
+    @staticmethod
+    def process_refund(booking):
+        """
+        Process full refund for a booking and cancel it.
+        """
+        if booking.status != 'confirmed':
+            raise ValueError("Only confirmed bookings can be refunded")
+            
+        if Transaction.objects.filter(booking=booking, transaction_type='refund').exists():
+            raise ValueError("Booking already refunded")
+            
+        with transaction.atomic():
+            # Create refund transaction
+            refund_tx = Transaction.objects.create(
+                booking=booking,
+                user=booking.user,
+                amount=booking.total_amount,
+                currency=booking.currency,
+                transaction_type='refund',
+                status='pending'
+            )
+            
+            # Update booking status
+            booking.status = 'cancelled'
+            booking.save()
+            
+            return refund_tx
+
+    @staticmethod
+    def process_payout(booking):
+        """
+        Calculate and process payout to vendor.
+        """
+        if booking.status != 'confirmed':
+            raise ValueError("Payout can only be processed for confirmed bookings")
+
+        if Transaction.objects.filter(booking=booking, transaction_type='payout').exists():
+            return None # Already processed
+
+        # Get the service owner (vendor) from booking items
+        # Assuming all items in a booking belong to the same vendor for now
+        # or we pick the first one as the primary vendor
+        booking_items = booking.items.all()
+        if not booking_items.exists():
+            raise ValueError("No booking items found")
+            
+        vendor = booking_items.first().service.user
+        
+        commission_rate = FinancialService.COMMISSION_RATE
+        payout_amount = booking.total_amount * (Decimal('1.00') - commission_rate)
+        
+        return Transaction.objects.create(
+            booking=booking,
+            user=vendor,
+            amount=payout_amount,
+            currency=booking.currency,
+            transaction_type='payout',
+            status='completed'
+        )

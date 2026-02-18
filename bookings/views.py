@@ -8,6 +8,7 @@ from .serializers import (
     BookingItemSerializer, BookingSerializer, TripSubmissionSerializer,
     AdminBookingSerializer, PackageSerializer, PackageItemSerializer
 )
+from .services import FinancialService
 # Tickets related imports
 from rest_framework.decorators import api_view
 from tickets.models import Ticket
@@ -441,30 +442,20 @@ def process_commission(request, booking_id):
     try:
         booking = Booking.objects.get(id=booking_id, status='confirmed')
         
-        # Check if commission already processed
-        if Transaction.objects.filter(booking=booking, transaction_type='commission').exists():
-            return Response({'message': 'Commission already processed'}, status=status.HTTP_200_OK)
+        transaction = FinancialService.process_commission(booking)
         
-        # Calculate commission (10% of total amount)
-        commission_rate = Decimal('0.10')
-        commission_amount = booking.total_amount * commission_rate
-        
-        # Create commission transaction
-        transaction = Transaction.objects.create(
-            booking=booking,
-            user=booking.user,
-            amount=commission_amount,
-            currency=booking.currency,
-            transaction_type='commission',
-            status='completed'
-        )
-        
+        if not transaction:
+             return Response({'message': 'Commission already processed'}, status=status.HTTP_200_OK)
+
         serializer = TransactionSerializer(transaction)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
         
     except Booking.DoesNotExist:
         return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
-    except Exception:
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print(f"Error processing commission: {e}")
         return Response({'error': 'Failed to process commission'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -486,32 +477,19 @@ def process_refund(request, booking_id):
     try:
         booking = Booking.objects.get(id=booking_id, user=request.user)
         
-        if booking.status != 'confirmed':
-            return Response({'error': 'Only confirmed bookings can be refunded'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if already refunded
-        if Transaction.objects.filter(booking=booking, transaction_type='refund').exists():
-            return Response({'error': 'Booking already refunded'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create refund transaction
-        transaction = Transaction.objects.create(
-            booking=booking,
-            user=booking.user,
-            amount=booking.total_amount,
-            currency=booking.currency,
-            transaction_type='refund',
-            status='pending'
-        )
-        
-        # Update booking status
-        booking.status = 'cancelled'
-        booking.save()
-        
+        try:
+             transaction = FinancialService.process_refund(booking)
+        except ValueError as e:
+             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = TransactionSerializer(transaction)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
         
     except Booking.DoesNotExist:
         return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f"Error processing refund: {e}")
+        return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 
 @api_view(['POST'])
@@ -519,31 +497,13 @@ def process_payout(request, booking_id):
     try:
         booking = Booking.objects.get(id=booking_id, status='confirmed')
         
-        # Get the service owner (vendor) from booking items
-        booking_items = booking.items.all()
-        if not booking_items.exists():
-            return Response({'error': 'No booking items found'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Assuming all items in a booking belong to the same vendor
-        vendor = booking_items.first().service.user
-        
-        # Check if payout already processed
-        if Transaction.objects.filter(booking=booking, transaction_type='payout').exists():
-            return Response({'message': 'Payout already processed'}, status=status.HTTP_200_OK)
-        
-        # Calculate payout (90% of total amount - after 10% commission)
-        commission_rate = Decimal('0.10')
-        payout_amount = booking.total_amount * (Decimal('1.00') - commission_rate)
-        
-        # Create payout transaction
-        transaction = Transaction.objects.create(
-            booking=booking,
-            user=vendor,  # Payout goes to vendor
-            amount=payout_amount,
-            currency=booking.currency,
-            transaction_type='payout',
-            status='completed'
-        )
+        try:
+            transaction = FinancialService.process_payout(booking)
+        except ValueError as e:
+             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+             
+        if not transaction:
+             return Response({'message': 'Payout already processed'}, status=status.HTTP_200_OK)
         
         serializer = TransactionSerializer(transaction)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
