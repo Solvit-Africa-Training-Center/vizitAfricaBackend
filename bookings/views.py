@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db import transaction
 from .models import BookingItem, Booking, Package, PackageItem
+from accounts.models import User
 from .serializers import (
     BookingItemSerializer, BookingSerializer, TripSubmissionSerializer,
     AdminBookingSerializer, PackageSerializer, PackageItemSerializer
@@ -239,6 +240,19 @@ class TripSubmissionView(generics.CreateAPIView):
         submission_serializer.is_valid(raise_exception=True)
         data = submission_serializer.validated_data
         
+        # 1.1 Check Request Limits (Max 2 pending)
+        if request.user.is_authenticated:
+            pending_count = Booking.objects.filter(
+                user=request.user, 
+                status__in=['pending', 'quoted']
+            ).count()
+            
+            if pending_count >= 2:
+                 return Response(
+                     {'error': 'You have reached the limit of 2 pending trip requests. Please manage your existing requests before submitting a new one.'}, 
+                     status=status.HTTP_400_BAD_REQUEST
+                 )
+        
         # 2. Extract Data
         import datetime
         guest_info = {}
@@ -322,9 +336,10 @@ class TripSubmissionView(generics.CreateAPIView):
             unit_price = service.base_price if service else Decimal(str(item.get('price', 0)))
             quantity = item.get('quantity', 1)
             
-            # Dates
-            start_date = data.get('departureDate')
-            end_date = data.get('returnDate') or start_date
+            # Dates & Times
+            # Prefer item-specific date, else global trip date
+            start_date = item.get('start_date') or data.get('departureDate')
+            end_date = item.get('end_date') or data.get('returnDate') or start_date
             
             # Create Item
             booking_item = BookingItem.objects.create(
@@ -333,6 +348,10 @@ class TripSubmissionView(generics.CreateAPIView):
                 user=user,
                 start_date=start_date,
                 end_date=end_date,
+                start_time=item.get('start_time'),
+                end_time=item.get('end_time'),
+                is_round_trip=item.get('is_round_trip', False),
+                return_date=item.get('return_date'),
                 quantity=quantity,
                 unit_price=unit_price,
                 subtotal=unit_price * quantity,
@@ -504,7 +523,7 @@ def process_payout(request, booking_id):
              
         if not transaction:
              return Response({'message': 'Payout already processed'}, status=status.HTTP_200_OK)
-        
+
         serializer = TransactionSerializer(transaction)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
         
@@ -591,7 +610,7 @@ def send_quote(request, booking_id):
          return Response({'error': 'Items list is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        from .services import QuoteService, NotificationService
+        from .services import QuoteService
         
         # 1. Generate Quote
         updated_booking = QuoteService.generate_quote(booking, items, request.user)
@@ -650,3 +669,88 @@ def accept_quote(request, booking_id):
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({'error': f"Failed to confirm booking: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def cancel_booking(request, booking_id):
+    if not request.user.is_authenticated:
+        return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        booking = Booking.objects.get(id=booking_id, user=request.user)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if booking.status not in ['pending', 'quoted']:
+        return Response({'error': 'Cannot cancel booking in current status'}, status=status.HTTP_400_BAD_REQUEST)
+
+    booking.status = 'cancelled'
+    booking.save()
+
+
+@api_view(['POST'])
+def notify_vendor(request, booking_id):
+    """
+    Notify a vendor about a specific item in a booking to check availability.
+    Payload: { "item_id": "...", "service_id": "..." } (one is required)
+    """
+    if not (request.user and request.user.is_authenticated and getattr(request.user, "role", "") == "ADMIN"):
+        return Response({'error': 'Only admin can notify vendors'}, status=status.HTTP_403_FORBIDDEN)
+
+    item_id = request.data.get('item_id')
+    service_id = request.data.get('service_id')
+
+    if not item_id and not service_id:
+        return Response({'error': 'Item ID or Service ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from services.models import Service
+        service = None
+        
+        # Scenario A: Notify for an existing BookingItem
+        if item_id:
+            try:
+                booking_item = BookingItem.objects.get(id=item_id)
+                service = booking_item.service
+                # If no service linked yet, we can't notify a vendor unless we find one matching the title?
+                # For now assuming service is linked.
+            except BookingItem.DoesNotExist:
+                pass # Fallback or error?
+        
+        # Scenario B: Notify for a Service directly (e.g. from requested item that maps to a service)
+        if not service and service_id:
+            try:
+                service = Service.objects.get(id=service_id)
+            except Service.DoesNotExist:
+                 try:
+                     # Try external ID lookup
+                     service = Service.objects.filter(external_id=service_id).first()
+                 except:
+                     pass
+
+        if not service:
+            return Response({'error': 'Service not found to notify vendor'}, status=status.HTTP_404_NOT_FOUND)
+
+        vendor = service.user
+        if not vendor or not vendor.email:
+             return Response({'error': 'Vendor not found or has no email'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Prepare details
+        from accounts.utils.send_email import send_vendor_inquiry_email
+        
+        details = {
+            'title': service.title,
+            'type': service.category or 'Service',
+            'date': request.data.get('date', 'Specified Dates'),
+            'quantity': request.data.get('quantity', 1),
+            'description': request.data.get('description', '')
+        }
+        
+        send_vendor_inquiry_email(vendor.email, vendor.full_name, details)
+
+        return Response({'message': f'Inquiry sent to {vendor.email}'}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print(f"Notify vendor error: {e}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

@@ -3,7 +3,15 @@ from rest_framework.serializers import ModelSerializer
 from .models import Service, ServiceMedia, ServiceAvailability, Discount
 
 
+class ServiceMediaSerializer(ModelSerializer):
+    class Meta:
+        model = ServiceMedia
+        fields = "__all__"
+
+
 class ServiceSerializer(ModelSerializer):
+    media = ServiceMediaSerializer(many=True, read_only=True)
+
     class Meta:
         model = Service
         fields = "__all__"
@@ -19,12 +27,6 @@ class ServiceSerializer(ModelSerializer):
             from accounts.models import User
             if not (hasattr(request.user, 'role') and request.user.role == User.ADMIN):
                 self.fields['user'].read_only = True
-
-
-class ServiceMediaSerializer(ModelSerializer):
-    class Meta:
-        model = ServiceMedia
-        fields = "__all__"
 
 
 class ServiceAvailabilitySerializer(serializers.ModelSerializer):

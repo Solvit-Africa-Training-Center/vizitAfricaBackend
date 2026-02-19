@@ -125,3 +125,77 @@ def send_client_quote_email(recipient_email, guest_name, booking_id, quote_items
         template_name="emails/client_quote.html",
         recipient_email=recipient_email
     )
+
+def send_vendor_booking_request(booking):
+    """
+    Send email to vendors for a confirmed booking.
+    Groups items by vendor (service owner) and sends individual emails.
+    """
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+    
+    # 1. Group items by vendor
+    vendor_items = {}
+    items = booking.items.all().select_related('service', 'service__user')
+    
+    for item in items:
+        if not item.service or not item.service.user:
+            continue
+            
+        vendor = item.service.user
+        if vendor not in vendor_items:
+            vendor_items[vendor] = []
+        vendor_items[vendor].append(item)
+    
+    # 2. Send email to each vendor
+    for vendor, v_items in vendor_items.items():
+        context = {
+            'vendor_name': vendor.full_name or "Partner",
+            'guest_name': booking.user.full_name,
+            'booking_id': str(booking.id),
+            'items': [
+                {
+                    'title': item.service.title,
+                    'start_date': item.start_date,
+                    'start_time': item.start_time,
+                    'quantity': item.quantity,
+                    'notes': item.metadata.get('notes', '')
+                }
+                for item in v_items
+            ],
+            'dashboard_link': f"{frontend_url}/en/vendor/bookings"
+        }
+        
+        try:
+            _send_async_email(
+                subject=f"New Booking Request #{booking.id}",
+                context=context,
+                template_name="emails/vendor_booking_request.html",
+                recipient_email=vendor.email
+            )
+        except Exception as e:
+            print(f"Failed to send email to vendor {vendor.email}: {e}")
+
+def send_vendor_inquiry_email(recipient_email, vendor_name, item_details):
+    """
+    Send an email to a vendor inquiring about availability for a specific service.
+    """
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+
+    context = {
+        'vendor_name': vendor_name or "Partner",
+        'service_title': item_details.get('title', 'Service'),
+        'service_type': item_details.get('type', 'Service'),
+        'date': item_details.get('date', 'N/A'),
+        'quantity': item_details.get('quantity', 1),
+        'notes': item_details.get('description', ''),
+        # In a real app, this might link to a vendor dashboard to reply directly
+        'dashboard_link': f"{frontend_url}/en/vendor/inquiries"
+    }
+
+    return _send_async_email(
+        subject=f"Availability Inquiry: {item_details.get('title', 'Service')}",
+        context=context,
+        template_name="emails/vendor_inquiry.html",
+        recipient_email=recipient_email
+    )
+

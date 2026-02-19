@@ -6,7 +6,7 @@ from .views import (
     generate_ticket, download_ticket, verify_ticket, process_commission, 
     transaction_history, process_refund, vendor_payouts, process_payout, 
     AdminBookingListView, AdminBookingDetailView, PackageViewSet, PackageItemViewSet,
-    send_quote, accept_quote
+    send_quote, accept_quote, cancel_booking, notify_vendor
 )
 
 router = DefaultRouter()
@@ -45,6 +45,8 @@ urlpatterns = [
     # RESTful Quote Management
     path('<uuid:booking_id>/quote/', send_quote, name='manage-quote'),
     path('<uuid:booking_id>/accept/', accept_quote, name='accept-quote'),
+    path('<uuid:booking_id>/cancel/', cancel_booking, name='cancel-booking'),
+    path('<uuid:booking_id>/notify-vendor/', notify_vendor, name='notify-vendor'),
 
     path('', include(router.urls)),
 ]

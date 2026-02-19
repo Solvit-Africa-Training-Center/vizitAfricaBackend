@@ -80,7 +80,7 @@ class BookingService:
                 service=service_instance,
                 item_type=item.get('type', 'custom'),
                 title=item.get('title') or (service_instance.title if service_instance else 'Custom Item'),
-                description=item.get('description', ''),
+                description=item.get('description') or '',
                 quantity=item.get('quantity', 1),
                 unit_price=Decimal(str(item.get('unit_price', 0))),
                 subtotal=Decimal(str(item.get('line_total', 0))),
@@ -100,6 +100,13 @@ class BookingService:
         booking.guest_info['packageQuote'] = quote
         booking.save()
         
+        # 5. Send Vendor Emails
+        try:
+            from accounts.utils.send_email import send_vendor_booking_request
+            send_vendor_booking_request(booking)
+        except Exception as e:
+            print(f"Failed to trigger vendor emails: {e}")
+            
         return booking
 
 

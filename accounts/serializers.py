@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from accounts.models import User, VerificationCode
+from accounts.models import User, VerificationCode, SavedItem
 from accounts.utils.code_generator import generate_verification_code
 from accounts.utils.send_email import send_verification_email
 from google.oauth2 import id_token
@@ -13,6 +13,57 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.models import User
 
 
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "email",
+            "full_name",
+            "phone_number",
+            "bio",
+            "role",
+            "preferred_currency",
+            "is_active",
+            "created_at",
+        )
+        read_only_fields = ("id", "email", "role", "is_active", "created_at")
+
+
+class SavedItemSerializer(serializers.ModelSerializer):
+    # We can try to serialize the content_object generically or just return ID/Type
+    content_object = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SavedItem
+        fields = ('id', 'created_at', 'object_id', 'content_object')
+        
+    def get_content_object(self, obj):
+        # basic info about the saved object
+        if not obj.content_object:
+            return None
+            
+        data = {
+            'id': str(obj.object_id),
+            'type': obj.content_type.model,
+            'title': str(obj.content_object)
+        }
+        
+        # Try to get more specific fields if they exist
+        if hasattr(obj.content_object, 'title'):
+            data['title'] = obj.content_object.title
+        elif hasattr(obj.content_object, 'name'):
+            data['title'] = obj.content_object.name
+            
+        if hasattr(obj.content_object, 'description'):
+            data['description'] = obj.content_object.description
+            
+        # Add image if available (Service/Experience usually has media)
+        if hasattr(obj.content_object, 'media') and obj.content_object.media.exists():
+            data['image'] = obj.content_object.media.first().media_url
+            
+        return data
 
 # ===================================================
 # USER REGISTRATION
