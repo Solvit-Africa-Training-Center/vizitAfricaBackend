@@ -50,7 +50,7 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault("role", User.ADMIN)
+        extra_fields.setdefault("role", self.model.Role.ADMIN)
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
@@ -62,15 +62,15 @@ class UserManager(BaseUserManager):
 # USER MODEL
 # ===================================================
 class User(AbstractBaseUser, PermissionsMixin):
-    CLIENT = "CLIENT"
-    VENDOR = "VENDOR"
-    ADMIN = "ADMIN"
+    class Role(models.TextChoices):
+        CLIENT = "CLIENT", _("Client")
+        VENDOR = "VENDOR", _("Vendor")
+        ADMIN = "ADMIN", _("Admin")
 
-    ROLE_CHOICES = [
-        (CLIENT, "Client"),
-        (VENDOR, "Vendor"),
-        (ADMIN, "Admin"),
-    ]
+    # Role Constants for easy access
+    CLIENT = Role.CLIENT
+    VENDOR = Role.VENDOR
+    ADMIN = Role.ADMIN
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -88,8 +88,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     role = models.CharField(
         max_length=20,
-        choices=ROLE_CHOICES,
-        default=CLIENT,
+        choices=Role.choices,
+        default=Role.CLIENT,
     )
 
     preferred_currency = models.CharField(
@@ -110,23 +110,28 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
+    @property
+    def is_admin(self):
+        return self.role == self.Role.ADMIN
+
+    @property
+    def is_vendor(self):
+        return self.role == self.Role.VENDOR
 
 
 class VerificationCode(models.Model):
-    SIGNUP = "SIGNUP"
-
-    PURPOSE_CHOICES = [
-        (SIGNUP, "Signup"),
-    ]
+    class Purpose(models.TextChoices):
+        SIGNUP = "SIGNUP", _("Signup")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         "User", on_delete=models.CASCADE, related_name="verification_codes"
     )
     code = models.CharField(max_length=6)
-    purpose = models.CharField(max_length=30, choices=PURPOSE_CHOICES)
+    purpose = models.CharField(max_length=30, choices=Purpose.choices)
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
 
     class Meta:
         unique_together = ("user", "code")

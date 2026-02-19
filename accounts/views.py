@@ -20,6 +20,10 @@ from accounts.serializers import (
 from accounts.permissions import IsAdmin
 
 
+from accounts.services import AccountService, SavedItemService
+from accounts.permissions import IsAdmin
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     Endpoints:
@@ -55,24 +59,16 @@ class UserViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        user = serializer.save()
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def verify_email(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        user = serializer.validated_data["user"]
-        verification = serializer.validated_data["verification"]
-
-        user.is_active = True
-        user.save()
-
-        verification.is_used = True
-        verification.save()
-
+        
+        # Service already performed activation during validation
         return Response(
             {"message": "Account activated successfully"},
             status=status.HTTP_200_OK,
@@ -94,12 +90,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 "message": "Password set successfully. You are now logged in.",
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
-                "user": {
-                    "id": str(user.id),
-                    "email": user.email,
-                    "full_name": user.full_name,
-                    "role": user.role,
-                }
+                "user": UserSerializer(user).data
             },
             status=status.HTTP_200_OK,
         )
@@ -122,9 +113,8 @@ class GoogleLoginView(APIView):
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
-from accounts.serializers import SavedItemSerializer
+from accounts.serializers import SavedItemSerializer, UserSerializer
 from accounts.models import SavedItem
-from django.contrib.contenttypes.models import ContentType
 
 class SavedItemViewSet(viewsets.ModelViewSet):
     serializer_class = SavedItemSerializer
@@ -141,30 +131,10 @@ class SavedItemViewSet(viewsets.ModelViewSet):
         if not item_type or not item_id:
              return Response({'error': 'Type and ID are required'}, status=status.HTTP_400_BAD_REQUEST)
              
-        # Resolve Content Type
-        # Mapping simple names to actual models if needed, or rely on app_label.model
-        # For now, let's assume 'service' maps to 'services.service'
-        
-        app_label = 'services' if item_type in ['service', 'experience'] else 'bookings' # fallback
-        model_name = item_type if item_type != 'experience' else 'service' # Experience is a Service
-        
-        try:
-            ct = ContentType.objects.get(app_label=app_label, model=model_name)
-        except ContentType.DoesNotExist:
-             # Try generic lookup
-             try:
-                 ct = ContentType.objects.get(model=item_type)
-             except ContentType.DoesNotExist:
-                 return Response({'error': f'Invalid type: {item_type}'}, status=status.HTTP_400_BAD_REQUEST)
-                 
-        # Check if already saved
-        if SavedItem.objects.filter(user=request.user, content_type=ct, object_id=item_id).exists():
-             return Response({'message': 'Item already saved'}, status=status.HTTP_200_OK)
-             
-        saved_item = SavedItem.objects.create(
+        saved_item = SavedItemService.save_item(
             user=request.user,
-            content_type=ct,
-            object_id=item_id
+            item_type=item_type,
+            item_id=item_id
         )
         
         serializer = self.get_serializer(saved_item)
@@ -172,30 +142,22 @@ class SavedItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def remove(self, request):
-        # Custom remove endpoint taking type/id
         item_type = request.data.get('type')
         item_id = request.data.get('id')
         
         if not item_type or not item_id:
              return Response({'error': 'Type and ID are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        app_label = 'services' if item_type in ['service', 'experience'] else 'bookings'
-        model_name = item_type if item_type != 'experience' else 'service'
+        removed = SavedItemService.remove_item(
+            user=request.user,
+            item_type=item_type,
+            item_id=item_id
+        )
         
-        try:
-            ct = ContentType.objects.get(app_label=app_label, model=model_name)
-        except ContentType.DoesNotExist:
-             try:
-                 ct = ContentType.objects.get(model=item_type)
-             except ContentType.DoesNotExist:
-                 return Response({'error': f'Invalid type: {item_type}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        deleted, _ = SavedItem.objects.filter(user=request.user, content_type=ct, object_id=item_id).delete()
-        
-        if deleted:
+        if removed:
             return Response({'message': 'Item removed'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+
 
 
 from django.core.mail import send_mail

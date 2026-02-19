@@ -27,8 +27,20 @@ class UserSerializer(serializers.ModelSerializer):
             "preferred_currency",
             "is_active",
             "created_at",
+            "vendor_profile",
         )
         read_only_fields = ("id", "email", "role", "is_active", "created_at")
+
+    def get_vendor_profile(self, obj):
+        if hasattr(obj, 'vendor_profile'):
+            return {
+                'id': obj.vendor_profile.id,
+                'business_name': obj.vendor_profile.business_name,
+                'is_approved': obj.vendor_profile.is_approved
+            }
+        return None
+
+    vendor_profile = serializers.SerializerMethodField()
 
 
 class SavedItemSerializer(serializers.ModelSerializer):
@@ -64,6 +76,8 @@ class SavedItemSerializer(serializers.ModelSerializer):
             data['image'] = obj.content_object.media.first().media_url
             
         return data
+
+from accounts.services import AccountService, SavedItemService
 
 # ===================================================
 # USER REGISTRATION
@@ -103,8 +117,9 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("re_password")
-
-        user = User.objects.create_user(
+        
+        # Use service to handle registration logic
+        return AccountService.register_user(
             email=validated_data["email"],
             password=validated_data["password"],
             full_name=validated_data["full_name"],
@@ -112,20 +127,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
             bio=validated_data.get("bio", ""),
             role=validated_data.get("role", User.CLIENT),
             preferred_currency=validated_data.get("preferred_currency", "USD"),
-            is_active=False,  # 🔐 wait for email verification
         )
-
-        code = generate_verification_code()
-
-        VerificationCode.objects.create(
-            user=user,
-            code=code,
-            purpose=VerificationCode.SIGNUP,
-        )
-
-        send_verification_email(user.email, code)
-
-        return user
 
 
 # ===================================================
@@ -136,26 +138,13 @@ class VerifyEmailSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=6)
 
     def validate(self, attrs):
-        try:
-            user = User.objects.get(email=attrs["email"])
-        except User.DoesNotExist:
-            raise serializers.ValidationError({"email": "User not found"})
-
-        try:
-            verification = VerificationCode.objects.get(
-                user=user,
-                code=attrs["code"],
-                purpose=VerificationCode.SIGNUP,
-                is_used=False,
-            )
-        except VerificationCode.DoesNotExist:
-            raise serializers.ValidationError({"code": "Invalid code"})
-
-        if not verification.is_valid:
-            raise serializers.ValidationError({"code": "Code expired"})
-
+        # Service handles validation and activation
+        # This will raise ValidationError if invalid
+        user = AccountService.verify_email(
+            email=attrs["email"],
+            code=attrs["code"]
+        )
         attrs["user"] = user
-        attrs["verification"] = verification
         return attrs
 
 
@@ -241,21 +230,16 @@ class SetPasswordSerializer(serializers.Serializer):
         if attrs["password"] != attrs["re_password"]:
             raise serializers.ValidationError({"password": "Passwords do not match"})
         
-        try:
-            uid = urlsafe_base64_decode(attrs["uidb64"]).decode()
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            raise serializers.ValidationError({"token": "Invalid user identification"})
-
-        if not default_token_generator.check_token(user, attrs["token"]):
-            raise serializers.ValidationError({"token": "Invalid or expired token"})
-
-        attrs["user"] = user
+        # Validation logic is now in Service too, but DRF validation is also fine here.
+        # Let's keep the service call in save() to be consistent.
         return attrs
 
     def save(self):
-        user = self.validated_data["user"]
-        user.set_password(self.validated_data["password"])
-        user.save()
-        return user
+        # Use service to handle password setting logic
+        return AccountService.set_password(
+            uidb64=self.validated_data["uidb64"],
+            token=self.validated_data["token"],
+            password=self.validated_data["password"]
+        )
+
 

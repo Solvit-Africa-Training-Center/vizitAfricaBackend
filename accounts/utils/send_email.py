@@ -1,8 +1,11 @@
+import logging
 import threading
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from urllib.parse import quote_plus
+
+logger = logging.getLogger(__name__)
 
 class EmailThread(threading.Thread):
     def __init__(self, subject, text_content, html_content, from_email, recipient_list):
@@ -25,7 +28,7 @@ class EmailThread(threading.Thread):
                 msg.attach_alternative(self.html_content, "text/html")
             msg.send()
         except Exception as e:
-            print(f"Failed to send email to {self.recipient_list}: {e}")
+            logger.error(f"Failed to send email to {self.recipient_list}: {e}")
 
 def _send_async_email(subject, context, template_name, recipient_email):
     """
@@ -37,7 +40,7 @@ def _send_async_email(subject, context, template_name, recipient_email):
     try:
         html_content = render_to_string(template_name, context)
     except Exception as e:
-        print(f"Template rendering failed for {template_name}: {e}")
+        logger.error(f"Template rendering failed for {template_name}: {e}")
         return 0
 
     text_content = "Please enable HTML to view this email."
