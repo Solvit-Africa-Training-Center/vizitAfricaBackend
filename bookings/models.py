@@ -7,12 +7,19 @@ import uuid
 
 
 class BookingItem(models.Model):
-    STATUS_CHOICES = [
-        ('draft', 'Draft'),
-        ('reserved', 'Reserved'), 
-        ('booked', 'Booked'),
-        ('cancelled', 'Cancelled'),
-    ]
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        RESERVED = 'reserved', 'Reserved'
+        BOOKED = 'booked', 'Booked'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    class ItemType(models.TextChoices):
+        FLIGHT = 'flight', 'Flight'
+        HOTEL = 'hotel', 'Hotel'
+        CAR = 'car', 'Car'
+        ACTIVITY = 'activity', 'Activity'
+        CUSTOM = 'custom', 'Custom'
+        SERVICE = 'service', 'Service'
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='booking_items')
@@ -20,24 +27,33 @@ class BookingItem(models.Model):
     booking = models.ForeignKey('Booking', on_delete=models.CASCADE, null=True, blank=True, related_name='items')
     
     # Flexible Item Fields
-    item_type = models.CharField(max_length=50, choices=[
-        ('flight', 'Flight'),
-        ('hotel', 'Hotel'),
-        ('car', 'Car'),
-        ('activity', 'Activity'),
-        ('custom', 'Custom'),
-        ('service', 'Service')
-    ], default='service')
+    item_type = models.CharField(
+        max_length=50, 
+        choices=ItemType.choices, 
+        default=ItemType.SERVICE
+    )
     title = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
+    
+    # Enhanced Scheduling
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    is_round_trip = models.BooleanField(default=False)
+    return_date = models.DateField(null=True, blank=True)
+
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    status = models.CharField(
+        max_length=20, 
+        choices=Status.choices, 
+        default=Status.DRAFT,
+        db_index=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     
@@ -50,19 +66,23 @@ class BookingItem(models.Model):
         super().save(*args, **kwargs)
 
 class Booking(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('quoted', 'Quoted'),
-        ('confirmed', 'Confirmed'),
-        ('cancelled', 'Cancelled'),
-        ('completed', 'Completed'),
-    ]
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        QUOTED = 'quoted', 'Quoted'
+        CONFIRMED = 'confirmed', 'Confirmed'
+        CANCELLED = 'cancelled', 'Cancelled'
+        COMPLETED = 'completed', 'Completed'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bookings')
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default='USD')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(
+        max_length=20, 
+        choices=Status.choices, 
+        default=Status.PENDING,
+        db_index=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     guest_info = models.JSONField(default=dict, blank=True)
@@ -72,22 +92,28 @@ class Booking(models.Model):
     
     def __str__(self):
         return f"Booking {self.id} for {self.user.email} - {self.status}"
+
     
     # def calculate_total(self):
     #     return sum(item.subtotal for item in self.items.all())
 
 class Package(models.Model):
-    STATUS_CHOICES = [
-        ('draft', 'Draft'),
-        ('sent', 'Sent'),
-        ('selected', 'Selected'),
-        ('paid', 'Paid'),
-    ]
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        SENT = 'sent', 'Sent'
+        SELECTED = 'selected', 'Selected'
+        PAID = 'paid', 'Paid'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='package')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    status = models.CharField(
+        max_length=20, 
+        choices=Status.choices, 
+        default=Status.DRAFT,
+        db_index=True
+    )
     notes = models.TextField(blank=True, null=True)
+
     expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

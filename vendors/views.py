@@ -21,11 +21,20 @@ class VendorViewSet(ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         from accounts.models import User
-        vendor_data = {'user': user}
+        
+        # If admin, allow serializer to handle user creation/linking
         if hasattr(user, 'role') and user.role == User.ADMIN:
-            vendor_data['is_approved'] = True
-            vendor_data['approved_by'] = user
-        serializer.save(**vendor_data)
+            serializer.save(is_approved=True, approved_by=user, approved_on=now())
+        else:
+            # Regular user creating their own vendor profile
+            serializer.save(user=user)
+
+    def perform_destroy(self, instance):
+        # Delete the associated user when the vendor profile is deleted
+        user = instance.user
+        instance.delete()
+        if user:
+            user.delete()
 
     from accounts.permissions import IsAdmin
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdmin])

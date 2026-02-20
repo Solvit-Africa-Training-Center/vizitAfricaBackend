@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+  <body
+    style="font-family: Arial, sans-serif; background: #f8f9fa; padding: 24px"
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="
+        max-width: 620px;
+        margin: 0 auto;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+      "
+    >
+      <tr>
+        <td style="padding: 24px">
+          <h2 style="margin: 0 0 12px 0; color: #111827">
+            Your Quote Is Ready
+          </h2>
+          <p style="color: #374151">
+            Hello {{ guest_name }}, your quote for booking
+            <strong>{{ booking_id }}</strong> is now available.
+          </p>
+          <table
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            style="
+              margin-top: 16px;
+              border: 1px solid #e5e7eb;
+              border-collapse: collapse;
+            "
+          >
+            <thead>
+              <tr style="background: #f9fafb">
+                <th style="padding: 10px; text-align: left">Service</th>
+                <th style="padding: 10px; text-align: center">Qty</th>
+                <th style="padding: 10px; text-align: right">Unit</th>
+                <th style="padding: 10px; text-align: right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb">
+                  {{ item.title|default:'Service' }}
+                </td>
+                <td
+                  style="
+                    padding: 10px;
+                    border-bottom: 1px solid #e5e7eb;
+                    text-align: center;
+                  "
+                >
+                  {{ item.quantity|default:1 }}
+                </td>
+                <td
+                  style="
+                    padding: 10px;
+                    border-bottom: 1px solid #e5e7eb;
+                    text-align: right;
+                  "
+                >
+                  {{ item.unit_price|default:0 }} {{ currency }}
+                </td>
+                <td
+                  style="
+                    padding: 10px;
+                    border-bottom: 1px solid #e5e7eb;
+                    text-align: right;
+                    font-weight: 600;
+                  "
+                >
+                  {{ item.line_total|default:0 }} {{ currency }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td
+                  colspan="3"
+                  style="padding: 12px; text-align: right; font-weight: 700"
+                >
+                  Grand Total
+                </td>
+                <td
+                  style="
+                    padding: 12px;
+                    text-align: right;
+                    font-weight: 700;
+                    color: #2d4685;
+                  "
+                >
+                  {{ total_amount }} {{ currency }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style="margin-top: 24px">
+            <a
+              href="{{ dashboard_link }}"
+              style="
+                display: inline-block;
+                padding: 12px 18px;
+                background: #2d4685;
+                color: white;
+                text-decoration: none;
+              "
+              >View in Dashboard</a
+            >
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

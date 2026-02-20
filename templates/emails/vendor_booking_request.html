@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: sans-serif;
+        line-height: 1.6;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .header {
+        background: #f8f9fa;
+        padding: 20px;
+        text-align: center;
+        border-bottom: 2px solid #e9ecef;
+      }
+      .content {
+        padding: 30px 20px;
+      }
+      .footer {
+        text-align: center;
+        font-size: 12px;
+        color: #666;
+        margin-top: 30px;
+      }
+      .button {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #000;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-top: 20px;
+      }
+      .item {
+        border: 1px solid #eee;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+      }
+      .label {
+        font-weight: bold;
+        font-size: 0.9em;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h2>New Booking Request</h2>
+        <p>Booking #{{ booking_id }}</p>
+      </div>
+      <div class="content">
+        <p>Hello {{ vendor_name }},</p>
+        <p>
+          You have received a new booking request from
+          <strong>{{ guest_name }}</strong> for the following items:
+        </p>
+
+        {% for item in items %}
+        <div class="item">
+          <h3 style="margin-top: 5px">{{ item.title }}</h3>
+          <p>
+            <span class="label">Date:</span> {{ item.start_date }} {% if
+            item.start_time %} at {{ item.start_time }}{% endif %}
+          </p>
+          <p><span class="label">Quantity:</span> {{ item.quantity }}</p>
+          {% if item.notes %}
+          <p><span class="label">Notes:</span> {{ item.notes }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        <p>
+          Please log in to your dashboard to confirm availability and manage
+          this booking.
+        </p>
+
+        <center>
+          <a href="{{ dashboard_link }}" class="button">Go to Dashboard</a>
+        </center>
+      </div>
+      <div class="footer">
+        <p>&copy; 2024 Vizit Africa. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+</html>

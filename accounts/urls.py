@@ -4,10 +4,11 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.views import GoogleLoginView
 
 
-from accounts.views import UserViewSet, LoginViewSet
+from accounts.views import UserViewSet, LoginViewSet, SavedItemViewSet, ContactView
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet, basename="users")
+router.register(r"saved-items", SavedItemViewSet, basename="saved-items")
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -16,4 +17,5 @@ urlpatterns = [
     path("login/", LoginViewSet.as_view(), name="login"),
     path("login/google/", GoogleLoginView.as_view(), name="google-login"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("contact/", ContactView.as_view(), name="contact"),
 ]

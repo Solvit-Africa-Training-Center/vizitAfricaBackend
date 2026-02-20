@@ -1,0 +1,221 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      font-family:
+        &quot;Inter&quot;,
+        -apple-system,
+        BlinkMacSystemFont,
+        &quot;Segoe UI&quot;,
+        Roboto,
+        sans-serif;
+      background-color: #f8f9fa;
+      color: #1a1a1a;
+    "
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="background-color: #f8f9fa; padding: 40px 20px"
+    >
+      <tr>
+        <td align="center">
+          <table
+            width="600"
+            cellpadding="0"
+            cellspacing="0"
+            style="
+              background-color: #ffffff;
+              border: 1px solid #e5e7eb;
+              border-radius: 4px;
+              overflow: hidden;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            "
+          >
+            <tr>
+              <td style="padding: 48px 40px; text-align: left">
+                <div style="margin-bottom: 32px">
+                  <span
+                    style="
+                      font-size: 20px;
+                      font-weight: 600;
+                      color: #2d4685;
+                      letter-spacing: -0.01em;
+                    "
+                    >Vizit Africa</span
+                  >
+                </div>
+                <h1
+                  style="
+                    color: #111827;
+                    margin: 0 0 16px 0;
+                    font-size: 28px;
+                    font-weight: 500;
+                    letter-spacing: -0.02em;
+                  "
+                >
+                  Your Journey Plan
+                </h1>
+                <p
+                  style="
+                    color: #4b5563;
+                    font-size: 16px;
+                    line-height: 1.6;
+                    margin: 0 0 32px 0;
+                  "
+                >
+                  Hello {{ guest_name }}, we've received your trip request. Our
+                  specialists are now sourcing the best real-time options for
+                  your selected experiences.
+                </p>
+
+                <div style="margin-bottom: 40px">
+                  <div
+                    style="
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: #111827;
+                      text-transform: uppercase;
+                      letter-spacing: 0.05em;
+                      border-bottom: 2px solid #2d4685;
+                      padding-bottom: 8px;
+                      display: inline-block;
+                    "
+                  >
+                    Proposed Itinerary
+                  </div>
+                  <div style="margin-top: 8px">
+                    {% for item in items %}
+                    <div
+                      style="padding: 24px 0; border-bottom: 1px solid #f3f4f6"
+                    >
+                      <div
+                        style="
+                          color: #2d4685;
+                          font-size: 11px;
+                          font-weight: 700;
+                          text-transform: uppercase;
+                          letter-spacing: 0.1em;
+                          margin-bottom: 8px;
+                        "
+                      >
+                        {{ item.type|default:'SERVICE' }}
+                      </div>
+                      <div
+                        style="
+                          color: #111827;
+                          font-size: 18px;
+                          font-weight: 500;
+                          margin-bottom: 4px;
+                        "
+                      >
+                        {{ item.title|default:'Trip Experience' }}
+                      </div>
+                      <div
+                        style="
+                          color: #6b7280;
+                          font-size: 14px;
+                          margin-bottom: 12px;
+                          line-height: 1.5;
+                        "
+                      >
+                        {{ item.description|default:'' }}
+                      </div>
+                      <div
+                        style="
+                          color: #111827;
+                          font-size: 14px;
+                          font-weight: 600;
+                        "
+                      >
+                        Est. Price: {% if item.price %}${{ item.price }}{% else
+                        %}Flexible{% endif %}
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <div
+                  style="
+                    background-color: #f9fafb;
+                    border-radius: 4px;
+                    padding: 32px;
+                    text-align: center;
+                  "
+                >
+                  <h3
+                    style="
+                      color: #111827;
+                      margin: 0 0 12px 0;
+                      font-size: 18px;
+                      font-weight: 500;
+                    "
+                  >
+                    Complete your profile
+                  </h3>
+                  <p
+                    style="
+                      color: #4b5563;
+                      font-size: 14px;
+                      line-height: 1.6;
+                      margin: 0 0 24px 0;
+                    "
+                  >
+                    Set your password now to track your request, view your
+                    finalized quote, and manage your travel documents in your
+                    dashboard.
+                  </p>
+                  <a
+                    href="{{ password_link }}"
+                    style="
+                      background-color: #2d4685;
+                      color: #ffffff;
+                      text-decoration: none;
+                      padding: 14px 28px;
+                      border-radius: 4px;
+                      display: inline-block;
+                      font-size: 14px;
+                      font-weight: 600;
+                      text-transform: uppercase;
+                      letter-spacing: 0.05em;
+                    "
+                    >Set Account Password</a
+                  >
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  background-color: #f9fafb;
+                  padding: 32px 40px;
+                  text-align: left;
+                "
+              >
+                <p
+                  style="
+                    color: #9ca3af;
+                    font-size: 12px;
+                    margin: 0;
+                    line-height: 1.5;
+                  "
+                >
+                  © 2024 Vizit Africa Logistics. All rights reserved.<br />
+                  Global standards, local expertise.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

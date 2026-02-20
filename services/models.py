@@ -9,18 +9,37 @@ from vendors.models import Vendor
 import uuid
 
 class Service(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        INACTIVE = 'inactive', 'Inactive'
+        PENDING = 'pending', 'Pending'
+        DELETED = 'deleted', 'Deleted'
+
+    class ServiceType(models.TextChoices):
+        HOTEL = 'hotel', 'Hotel'
+        CAR = 'car', 'Car'
+        ACTIVITY = 'activity', 'Activity'
+        EXPERIENCE = 'experience', 'Experience'
+        TOUR = 'tour', 'Tour'
+        GUIDE = 'guide', 'Guide'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='services')
     location = models.ForeignKey('locations.Location', on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255)
-    service_type = models.CharField(max_length=50)
+    service_type = models.CharField(max_length=50, choices=ServiceType.choices)
     description = models.TextField()
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
-    currency = models.CharField(max_length=10)
-    capacity = models.IntegerField()
-    status = models.CharField(max_length=20)
+    currency = models.CharField(max_length=10, default='USD')
+    capacity = models.IntegerField(default=1)
+    status = models.CharField(
+        max_length=20, 
+        choices=Status.choices, 
+        default=Status.ACTIVE,
+        db_index=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
-    external_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    external_id = models.CharField(max_length=50, unique=True, null=True, blank=True, db_index=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
@@ -28,9 +47,13 @@ class Service(models.Model):
 
 
 class ServiceMedia(models.Model):
+    class MediaType(models.TextChoices):
+        IMAGE = 'image', 'Image'
+        VIDEO = 'video', 'Video'
+
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='media')
     media_url = models.URLField()
-    media_type = models.CharField(max_length=10)  # 'image', 'video'
+    media_type = models.CharField(max_length=10, choices=MediaType.choices, default=MediaType.IMAGE)
     sort_order = models.IntegerField(default=0)
 
     def __str__(self):
@@ -50,16 +73,21 @@ class ServiceAvailability(models.Model):
 
 
 class Discount(models.Model):
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = 'percentage', 'Percentage'
+        FIXED = 'fixed', 'Fixed Amount'
+
     vendor = models.ForeignKey('vendors.Vendor', on_delete=models.SET_NULL, null=True, blank=True)
     code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    discount_type = models.CharField(max_length=20)  # 'percentage', 'fixed'
+    discount_type = models.CharField(max_length=20, choices=DiscountType.choices)
     discount_value = models.DecimalField(max_digits=10, decimal_places=2)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
 
     def __str__(self):
         return f"{self.code} - {self.name}"
