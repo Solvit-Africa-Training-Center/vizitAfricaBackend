@@ -32,7 +32,7 @@ class AccountService:
         VerificationCode.objects.create(
             user=user,
             code=code,
-            purpose=VerificationCode.SIGNUP,
+            purpose=VerificationCode.Purpose.SIGNUP,
         )
 
         try:
@@ -57,7 +57,7 @@ class AccountService:
             verification = VerificationCode.objects.get(
                 user=user,
                 code=code,
-                purpose=VerificationCode.SIGNUP,
+                purpose=VerificationCode.Purpose.SIGNUP,
                 is_used=False,
             )
         except VerificationCode.DoesNotExist:

@@ -18,3 +18,4 @@ whitenoise
 drf-spectacular==0.27.0
 google-auth
 requests
+stripe==10.6.0

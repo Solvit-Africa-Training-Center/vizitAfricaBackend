@@ -316,12 +316,28 @@ def notify_vendor(request, booking_id):
          return Response({'error': 'Vendor not found or has no email'}, status=status.HTTP_404_NOT_FOUND)
 
     from accounts.utils.send_email import send_vendor_inquiry_email
+    
+    dates = request.data.get('date', 'Specified Dates')
+    times = "Not specified"
+    metadata = {}
+    requirements = ""
+
+    if booking_item:
+        dates = f"{booking_item.start_date} - {booking_item.end_date}"
+        times = f"Start: {booking_item.start_time or 'N/A'}, End: {booking_item.end_time or 'N/A'}"
+        if booking_item.is_round_trip:
+            times += f", Return: {booking_item.return_date or 'N/A'} at {booking_item.return_time or 'N/A'}"
+        metadata = booking_item.metadata
+        requirements = booking_item.description
+
     details = {
-        'title': service.title,
-        'type': service.category or 'Service',
-        'date': request.data.get('date', 'Specified Dates'),
+        'item_id': str(item_id) if item_id else None,
+        'service_title': service.title,
+        'dates': dates,
+        'times': times,
         'quantity': request.data.get('quantity', 1),
-        'description': request.data.get('description', '')
+        'requirements': requirements,
+        'metadata': metadata
     }
     
     send_vendor_inquiry_email(vendor.email, vendor.full_name, details)

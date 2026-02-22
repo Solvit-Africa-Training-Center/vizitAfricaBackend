@@ -1,11 +1,14 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta
 from decimal import Decimal
 
 from accounts.models import User
 from vendors.models import Vendor
 from locations.models import Location
-from services.models import Service, ServiceMedia
+from services.models import Service, ServiceMedia, ServiceAvailability
+from bookings.models import Booking, BookingItem
 
 
 LOCATIONS = [
@@ -26,28 +29,81 @@ VENDORS_DATA = {
         "name": "Heaven Rwanda",
         "phone": "+250780000002",
         "business_name": "Heaven Rwanda",
-        "type": "hotel_chain"
+        "type": "hotel",
+        "status": "active",
+        "is_system_user": True
     },
     "rwandair": {
         "email": "vendor@rwandair.com",
         "name": "RwandAir Admin",
         "phone": "+250780000003",
         "business_name": "RwandAir",
-        "type": "airline"
+        "type": "other",
+        "status": "active",
+        "is_system_user": True
     },
     "volcanoes": {
         "email": "vendor@volcanoes.com",
         "name": "Volcanoes Safaris",
         "phone": "+250780000004",
         "business_name": "Volcanoes Safaris",
-        "type": "tour_operator"
+        "type": "experience",
+        "status": "active",
+        "is_system_user": True
     },
     "vizit": {
         "email": "vendor@vizit.com",
         "name": "Vizit Vendor",
         "phone": "+250780000005",
         "business_name": "Vizit Africa",
-        "type": "tour_operator"
+        "type": "experience",
+        "status": "active",
+        "is_system_user": True
+    },
+    "kigaliluxury": {
+        "email": "stay@kigaliluxury.rw",
+        "name": "Kigali Luxury Retreats",
+        "phone": "+250781111111",
+        "business_name": "Kigali Luxury Retreats",
+        "type": "hotel",
+        "status": "active",
+        "is_system_user": True
+    },
+    "silverback_guides": {
+        "email": "info@gorillaguides.rw",
+        "name": "Silverback Expedition Guides",
+        "phone": "+250782222222",
+        "business_name": "Silverback Expedition Guides",
+        "type": "guide",
+        "status": "active",
+        "is_system_user": True
+    },
+    "akagera_safari": {
+        "email": "travel@akagerapark.rw",
+        "name": "Akagera Safari Tours",
+        "phone": "+250783333333",
+        "business_name": "Akagera Safari Tours",
+        "type": "experience",
+        "status": "active",
+        "is_system_user": True
+    },
+    "rwanda_wheels": {
+        "email": "wheels@rwanda.rw",
+        "name": "Rwanda Express Car Rentals",
+        "phone": "+250784444444",
+        "business_name": "Rwanda Express Car Rentals",
+        "type": "car_rental",
+        "status": "active",
+        "is_system_user": True
+    },
+    "passive_guide": {
+        "email": "local.guide@example.com",
+        "name": "Jean Local Guide",
+        "phone": "+250789999999",
+        "business_name": "Jean's Local Tours",
+        "type": "guide",
+        "status": "active",
+        "is_system_user": False # Passive vendor
     }
 }
 
@@ -308,6 +364,19 @@ SERVICES = [
         "metadata": {"airline": "Ethiopian Airlines", "route": "KGL-ADD", "duration": "2h 10m", "class": "economy", "departure_time": "14:00", "arrival_time": "16:10"},
         "images": ["/images/person-waiting-at-airport.jpg"],
     },
+    # Passive Vendor Service
+    {
+        "external_id": "gd-3",
+        "vendor_key": "passive_guide",
+        "title": "Jean — Authentic Village Tour",
+        "service_type": "guide",
+        "description": "Experience daily life in a traditional Rwandan village. Jean takes you off the beaten path to meet local artisans, visit a coffee farm, and share a home-cooked meal in the rolling hills of Huye.",
+        "base_price": Decimal("50.00"),
+        "capacity": 4,
+        "location_name": "Huye",
+        "metadata": {"languages": ["Kinyarwanda", "French", "English"], "specialties": ["village_life", "farming", "community"], "years_experience": 15},
+        "images": ["/images/agaseke-black-white.jpg"],
+    },
 ]
 
 
@@ -329,8 +398,14 @@ class Command(BaseCommand):
         locations_map = self._seed_locations()
 
         # 5. Services
-        created, skipped = self._seed_services(vendors_map, locations_map)
+        created, skipped, all_services = self._seed_services(vendors_map, locations_map)
         
+        # 6. Availabilities
+        self._seed_availabilities(all_services)
+
+        # 7. Sample Bookings
+        self._seed_sample_bookings(all_services)
+
         # Summary
         self.stdout.write(self.style.SUCCESS(
             f"done — {created} services created, {skipped} skipped."
@@ -395,6 +470,8 @@ class Command(BaseCommand):
                     "vendor_type": data["type"],
                     "is_approved": True,
                     "approved_by": admin,
+                    "status": data.get("status", "active"),
+                    "is_system_user": data.get("is_system_user", True),
                 },
             )
             
@@ -419,6 +496,7 @@ class Command(BaseCommand):
     def _seed_services(self, vendors_map, locations_map):
         created_count = 0
         skipped_count = 0
+        all_services = []
 
         for svc in SERVICES:
             vendor = vendors_map.get(svc["vendor_key"])
@@ -428,15 +506,16 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"  Skipping {svc['title']} - missing vendor/location"))
                 continue
 
-            if Service.objects.filter(external_id=svc["external_id"]).exists():
+            service = Service.objects.filter(external_id=svc["external_id"]).first()
+            if service:
                 # Update existing service vendor
-                s = Service.objects.get(external_id=svc["external_id"])
-                if s.user != vendor.user:
-                    s.user = vendor.user
-                    s.save()
+                if service.user != vendor.user:
+                    service.user = vendor.user
+                    service.save()
                     self.stdout.write(f"  ~ updated owner: {svc['title']} -> {vendor.business_name}")
                 else:
                     skipped_count += 1
+                all_services.append(service)
                 continue
 
             service = Service.objects.create(
@@ -462,6 +541,91 @@ class Command(BaseCommand):
                 )
 
             created_count += 1
+            all_services.append(service)
             self.stdout.write(f"  + {svc['service_type']}: {svc['title']} (by {vendor.business_name})")
 
-        return created_count, skipped_count
+        return created_count, skipped_count, all_services
+
+    def _seed_availabilities(self, services):
+        self.stdout.write("  seeding availabilities...")
+        today = timezone.now().date()
+        for service in services:
+            # Create availability for the next 30 days
+            for i in range(30):
+                date = today + timedelta(days=i)
+                ServiceAvailability.objects.get_or_create(
+                    service=service,
+                    start_date=date,
+                    end_date=date,
+                    defaults={"available_quantity": service.capacity}
+                )
+
+    def _seed_sample_bookings(self, services):
+        self.stdout.write("  seeding sample bookings...")
+        client = User.objects.filter(role="CLIENT").first()
+        if not client: return
+
+        # 1. Complex Trip Request (Pending)
+        guest_info = {
+            "name": client.full_name,
+            "email": client.email,
+            "phone": client.phone_number,
+            "destination": "Kigali & Volcanoes",
+            "departureCity": "Paris",
+            "departureDate": (timezone.now() + timedelta(days=30)).date().isoformat(),
+            "returnDate": (timezone.now() + timedelta(days=40)).date().isoformat(),
+            "adults": 2,
+            "children": 1,
+            "infants": 1,
+            "tripPurpose": "honeymoon",
+            "needsFlights": True,
+            "needsHotel": True,
+            "needsCar": True,
+            "needsGuide": True,
+            "requestedItems": [
+                {
+                    "type": "hotel",
+                    "title": "The Retreat by Heaven",
+                    "quantity": 1,
+                    "metadata": {"room_type": "Luxury Suite"}
+                }
+            ]
+        }
+        
+        booking, _ = Booking.objects.get_or_create(
+            user=client,
+            status="pending",
+            defaults={
+                "total_amount": Decimal("0.00"),
+                "guest_info": guest_info
+            }
+        )
+
+        # 2. Detailed Confirmed Booking with Timing
+        confirmed_booking, created = Booking.objects.get_or_create(
+            user=client,
+            status="confirmed",
+            defaults={
+                "total_amount": Decimal("1500.00"),
+                "currency": "USD"
+            }
+        )
+
+        if created:
+            hotel_service = next((s for s in services if s.service_type == "hotel"), None)
+            if hotel_service:
+                BookingItem.objects.create(
+                    booking=confirmed_booking,
+                    user=client,
+                    service=hotel_service,
+                    item_type="hotel",
+                    title=hotel_service.title,
+                    start_date=timezone.now().date() + timedelta(days=10),
+                    end_date=timezone.now().date() + timedelta(days=12),
+                    start_time="14:00:00",
+                    end_time="11:00:00",
+                    quantity=1,
+                    unit_price=hotel_service.base_price,
+                    subtotal=hotel_service.base_price,
+                    status="booked"
+                )

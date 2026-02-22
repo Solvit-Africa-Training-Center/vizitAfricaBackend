@@ -10,7 +10,7 @@ class BookingItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'service', 'item_type', 'title', 'description', 
             'start_date', 'end_date', 'start_time', 'end_time', 
-            'is_round_trip', 'return_date', 'quantity', 
+            'is_round_trip', 'return_date', 'return_time', 'quantity', 
             'unit_price', 'subtotal', 'status', 'metadata', 'created_at'
         ]
         read_only_fields = ['subtotal', 'created_at']
@@ -46,19 +46,22 @@ class GuestInfoMixin:
         return self._info(obj).get('phone') or (obj.user.phone_number if obj.user else "")
 
     def get_arrivalDate(self, obj):
-        return self._info(obj).get('departureDate')
+        return self._info(obj).get('departureDate') or self._info(obj).get('arrivalDate')
 
     def get_departureDate(self, obj):
-        return self._info(obj).get('returnDate')
+        return self._info(obj).get('returnDate') or self._info(obj).get('departureDate')
 
     def get_adults(self, obj):
-        return int(self._info(obj).get('adults', 0) or 0)
+        val = self._info(obj).get('adults', 0)
+        return int(val) if val else 0
 
     def get_children(self, obj):
-        return int(self._info(obj).get('children', 0) or 0)
+        val = self._info(obj).get('children', 0)
+        return int(val) if val else 0
 
     def get_infants(self, obj):
-        return int(self._info(obj).get('infants', 0) or 0)
+        val = self._info(obj).get('infants', 0)
+        return int(val) if val else 0
 
     def get_travelers(self, obj):
         return self.get_adults(obj) + self.get_children(obj) + self.get_infants(obj)
@@ -80,7 +83,15 @@ class GuestInfoMixin:
             if item.service
         ]
 
-        requested_items = self._info(obj).get('requestedItems', [])
+        # Check explicit toggles from frontend if present
+        info = self._info(obj)
+        toggles = []
+        if info.get('needsFlights'): toggles.append('flight')
+        if info.get('needsHotel'): toggles.append('hotel')
+        if info.get('needsCar'): toggles.append('car')
+        if info.get('needsGuide'): toggles.append('guide')
+
+        requested_items = info.get('requestedItems', [])
         requested_types = []
         for item in requested_items:
             item_type = str(item.get('type', '')).lower()
@@ -102,19 +113,19 @@ class GuestInfoMixin:
             else:
                 requested_types.append('service')
 
-        return booking_service_types + requested_types
+        return booking_service_types + requested_types + toggles
 
     def get_needsFlights(self, obj):
-        return any(t == 'flight' for t in self._requested_item_types(obj))
+        return self._info(obj).get('needsFlights', False) or any(t == 'flight' for t in self._requested_item_types(obj))
 
     def get_needsHotel(self, obj):
-        return any(t in ['hotel', 'accommodation'] for t in self._requested_item_types(obj))
+        return self._info(obj).get('needsHotel', False) or any(t in ['hotel', 'accommodation'] for t in self._requested_item_types(obj))
 
     def get_needsCar(self, obj):
-        return any(t in ['car', 'car_rental', 'transport'] for t in self._requested_item_types(obj))
+        return self._info(obj).get('needsCar', False) or any(t in ['car', 'car_rental', 'transport'] for t in self._requested_item_types(obj))
 
     def get_needsGuide(self, obj):
-        return any(t in ['experience', 'guide', 'tour'] for t in self._requested_item_types(obj))
+        return self._info(obj).get('needsGuide', False) or any(t in ['experience', 'guide', 'tour'] for t in self._requested_item_types(obj))
 
 
 class BookingSerializer(GuestInfoMixin, serializers.ModelSerializer):
@@ -157,17 +168,46 @@ class TripSubmissionSerializer(serializers.Serializer):
 
     departureCity = serializers.CharField()
     destination = serializers.CharField(required=False, allow_blank=True)
+    
+    # Dates
+    arrivalDate = serializers.DateField(required=False, allow_null=True)
     departureDate = serializers.DateField()
     returnDate = serializers.DateField(required=False, allow_null=True)
-    adults = serializers.IntegerField()
-    children = serializers.IntegerField()
-    infants = serializers.IntegerField()
+    
+    # New Timing Fields
+    arrivalTime = serializers.TimeField(required=False, allow_null=True)
+    departureTime = serializers.TimeField(required=False, allow_null=True)
+    returnTime = serializers.TimeField(required=False, allow_null=True)
+    
+    roundTrip = serializers.BooleanField(default=False)
+    isRoundTrip = serializers.BooleanField(required=False)
+
+    # Demographics
+    adults = serializers.IntegerField(default=0)
+    children = serializers.IntegerField(default=0)
+    infants = serializers.IntegerField(default=0)
+
+    # User Info
     name = serializers.CharField()
     email = serializers.EmailField()
     phone = serializers.CharField()
-    tripPurpose = serializers.CharField()
+    
+    # Trip Context
+    tripPurpose = serializers.CharField(required=False, allow_blank=True)
     specialRequests = serializers.CharField(required=False, allow_blank=True)
 
+    # Service Requirements
+    needsFlights = serializers.BooleanField(default=False)
+    needsHotel = serializers.BooleanField(default=False)
+    needsCar = serializers.BooleanField(default=False)
+    needsGuide = serializers.BooleanField(default=False)
+
+    # Professional Preferences
+    preferredCabinClass = serializers.CharField(required=False, allow_blank=True)
+    hotelStarRating = serializers.CharField(required=False, allow_blank=True)
+    carTypePreference = serializers.CharField(required=False, allow_blank=True)
+    budgetBracket = serializers.CharField(required=False, allow_blank=True)
+    guideLanguages = serializers.ListField(child=serializers.CharField(), required=False)
 
     items = serializers.ListField(child=serializers.DictField())
 
@@ -183,7 +223,8 @@ class AdminBookingItemSerializer(serializers.ModelSerializer):
         model = BookingItem
         fields = [
             'id', 'service', 'item_type', 'title', 'description',
-            'start_date', 'end_date', 'quantity', 'unit_price', 'subtotal',
+            'start_date', 'end_date', 'start_time', 'end_time', 
+            'is_round_trip', 'return_date', 'return_time', 'quantity', 'unit_price', 'subtotal',
             'metadata', 'service_details'
         ]
         read_only_fields = ['subtotal']

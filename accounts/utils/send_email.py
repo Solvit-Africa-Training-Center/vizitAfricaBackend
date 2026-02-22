@@ -48,6 +48,16 @@ def _send_async_email(subject, context, template_name, recipient_email):
     EmailThread(subject, text_content, html_content, from_email, recipient_list).start()
     return 1 
 
+def send_email(subject, message, recipient_list, from_email=None, html_message=None):
+    """
+    Generic function to send emails asynchronously.
+    """
+    if from_email is None:
+        from_email = getattr(settings, 'EMAIL_HOST_USER', None) or getattr(settings, 'DEFAULT_FROM_EMAIL', None) or 'noreply@vizit-africa.com'
+    
+    EmailThread(subject, message, html_message, from_email, recipient_list).start()
+    return 1
+
 def send_verification_email(recipient_email, code):
     """Send an email containing a verification link (token)."""
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')

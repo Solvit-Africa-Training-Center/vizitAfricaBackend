@@ -44,6 +44,7 @@ class BookingItem(models.Model):
     end_time = models.TimeField(null=True, blank=True)
     is_round_trip = models.BooleanField(default=False)
     return_date = models.DateField(null=True, blank=True)
+    return_time = models.TimeField(null=True, blank=True)
 
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -69,7 +70,8 @@ class Booking(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
         QUOTED = 'quoted', 'Quoted'
-        CONFIRMED = 'confirmed', 'Confirmed'
+        ACCEPTED = 'accepted', 'Accepted'
+        PAID = 'paid', 'Paid'
         CANCELLED = 'cancelled', 'Cancelled'
         COMPLETED = 'completed', 'Completed'
 
@@ -83,9 +85,21 @@ class Booking(models.Model):
         default=Status.PENDING,
         db_index=True
     )
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('processing', 'Processing'),
+            ('succeeded', 'Succeeded'),
+            ('failed', 'Failed'),
+        ],
+        default='pending'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     guest_info = models.JSONField(default=dict, blank=True)
+    quote_accepted_at = models.DateTimeField(null=True, blank=True)
+    payment_completed_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         ordering = ['-created_at']

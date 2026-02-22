@@ -89,8 +89,12 @@ class BookingService:
                 subtotal=Decimal(str(item.get('line_total', 0))),
                 metadata=item.get('metadata', {}),
                 status='booked',
-                start_date=booking.guest_info.get('departureDate'),
-                end_date=booking.guest_info.get('returnDate')
+                start_date=item.get('start_date') or booking.guest_info.get('departureDate'),
+                end_date=item.get('end_date') or booking.guest_info.get('returnDate'),
+                start_time=item.get('start_time'),
+                end_time=item.get('end_time'),
+                is_round_trip=item.get('is_round_trip', False),
+                return_date=item.get('return_date'),
             )
             
         booking.status = 'confirmed'
@@ -205,6 +209,7 @@ class TripSubmissionService:
                 end_time=item.get('end_time'),
                 is_round_trip=item.get('is_round_trip', False),
                 return_date=item.get('return_date'),
+                return_time=item.get('return_time'),
                 quantity=qty,
                 unit_price=unit_price,
                 subtotal=unit_price * qty,
