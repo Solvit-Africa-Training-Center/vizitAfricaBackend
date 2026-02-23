@@ -1,19 +1,20 @@
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.utils.timezone import now
-from .models import Vendor
-from .serializers import VendorSerializer
-from .permissions import IsVendorOwner
-
-
 from rest_framework import status
-from rest_framework.permissions import AllowAny
-from django.db.models import Count, Sum
+from django.db import transaction
+from django.utils.timezone import now
+from django.db.models import Sum
+
 from accounts.models import User
 from bookings.models import BookingItem
 from bookings.serializers import BookingItemSerializer
+from .models import Vendor
+from .serializers import VendorSerializer
+from .permissions import IsVendorOwner
+from accounts.permissions import IsAdmin
+
 
 class VendorViewSet(ModelViewSet):
     serializer_class = VendorSerializer
@@ -28,45 +29,78 @@ class VendorViewSet(ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):
-        """Public endpoint for vendor registration."""
+        """public endpoint for vendor registration"""
         email = request.data.get('email')
         if not email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if User.objects.filter(email=email).exists():
-             return Response({"error": "A user with this email already exists"}, status=status.HTTP_400_BAD_REQUEST)
-             
+            return Response({"error": "A user with this email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
         with transaction.atomic():
             user = User.objects.create_user(
                 email=email,
                 full_name=request.data.get('name', 'Vendor'),
                 phone_number=request.data.get('phone', ''),
                 role=User.Role.VENDOR,
-                is_active=False # Pending admin approval/verification
+                is_active=False
             )
             user.set_unusable_password()
             user.save()
-            
+
             vendor = Vendor.objects.create(
                 user=user,
                 business_name=request.data.get('business_name', user.full_name),
                 vendor_type=request.data.get('type', 'other'),
                 status='pending'
             )
-            
-            # TODO: Trigger notification to admin
-            
+
         return Response(VendorSerializer(vendor).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['get'])
-    def dashboard(self, request):
-        """Return stats for the vendor's dashboard."""
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdmin])
+    def approve(self, request, pk=None):
+        """admin-only: approve a vendor and activate their account"""
+        vendor = self.get_object()
+        vendor.is_approved = True
+        vendor.status = Vendor.Status.ACTIVE
+        vendor.approved_by = request.user
+        vendor.approved_on = now()
+        vendor.save()
+
+        vendor.user.is_active = True
+        vendor.user.save()
+
+        return Response(VendorSerializer(vendor).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def confirm_item(self, request, pk=None):
+        """vendor: confirm a specific booking item assigned to them"""
         vendor = Vendor.objects.filter(user=request.user).first()
         if not vendor:
             return Response({"error": "Vendor profile not found"}, status=status.HTTP_404_NOT_FOUND)
-            
+
+        item = BookingItem.objects.filter(
+            id=pk,
+            service__user=request.user
+        ).first()
+
+        if not item:
+            return Response({"error": "Booking item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        item.status = 'booked'
+        item.save()
+
+        return Response(BookingItemSerializer(item).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def dashboard(self, request):
+        """return stats for the vendor's dashboard"""
+        vendor = Vendor.objects.filter(user=request.user).first()
+        if not vendor:
+            return Response({"error": "Vendor profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
         items = BookingItem.objects.filter(service__user=request.user)
-        
+
         stats = {
             "active_requests": items.filter(status='reserved').count(),
             "upcoming_bookings": items.filter(status='booked', start_date__gte=now().date()).count(),
@@ -76,16 +110,11 @@ class VendorViewSet(ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def requests(self, request):
-        """List booking items assigned to this vendor."""
+        """list booking items assigned to this vendor"""
         vendor = Vendor.objects.filter(user=request.user).first()
         if not vendor:
-             return Response({"error": "Vendor profile not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Vendor profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Filtering logic per vendor type
         items = BookingItem.objects.filter(service__user=request.user)
-        
-        # If Car Rental, they might want to see all car items regardless of specific service assignment
-        # or we rely strictly on service.user matching which is cleaner
-        
         serializer = BookingItemSerializer(items, many=True)
         return Response(serializer.data)

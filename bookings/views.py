@@ -161,13 +161,6 @@ def transaction_history(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
-def process_refund(request, booking_id):
-    booking = generics.get_object_or_404(Booking, id=booking_id, user=request.user)
-    transaction = FinancialService.process_refund(booking)
-    serializer = TransactionSerializer(transaction)
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-@api_view(['POST'])
 def process_payout(request, booking_id):
     booking = generics.get_object_or_404(Booking, id=booking_id)
     transaction = FinancialService.process_payout(booking)
@@ -270,8 +263,12 @@ def send_quote(request, booking_id):
 
 @api_view(['POST'])
 def accept_quote(request, booking_id):
+    from django.core.exceptions import ValidationError
     booking = generics.get_object_or_404(Booking, id=booking_id, user=request.user)
-    confirmed_booking = BookingService.confirm_quote(booking)
+    try:
+        confirmed_booking = BookingService.confirm_quote(booking)
+    except ValidationError as e:
+        return Response({'error': str(e.message)}, status=status.HTTP_400_BAD_REQUEST)
     return Response({
         'message': 'Quote accepted and booking confirmed',
         'booking_id': str(confirmed_booking.id),

@@ -7,59 +7,18 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.template.loader import render_to_string
+from django.conf import settings
 import json
 import logging
 import stripe
 
-from .services import cashin_payment, cashout_payment
 from .stripe_processor import StripePaymentProcessor
 from bookings.models import Booking
+from bookings.services import FinancialService
 from .models import Payment
 from accounts.utils.send_email import send_email
 
 logger = logging.getLogger(__name__)
-
-
-class CashInView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        amount = request.data.get("amount")
-        phone = request.data.get("phone_number")
-
-        if not amount or not phone:
-            return Response({"error": "amount and phone_number required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            amount_float = float(amount)
-            if amount_float <= 0:
-                raise ValueError
-        except ValueError:
-             return Response({"error": "Invalid amount"}, status=status.HTTP_400_BAD_REQUEST)
-
-        result = cashin_payment(amount_float, phone)
-        return Response(result, status=status.HTTP_200_OK)
-
-
-class CashOutView(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request):
-        amount = request.data.get("amount")
-        phone = request.data.get("phone_number")
-
-        if not amount or not phone:
-            return Response({"error": "amount and phone_number required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            amount_float = float(amount)
-            if amount_float <= 0:
-                raise ValueError
-        except ValueError:
-             return Response({"error": "Invalid amount"}, status=status.HTTP_400_BAD_REQUEST)
-
-        result = cashout_payment(amount_float, phone)
-        return Response(result, status=status.HTTP_200_OK)
 
 
 class CreatePaymentIntentView(APIView):
@@ -200,6 +159,13 @@ class ConfirmPaymentView(APIView):
                 booking.payment_completed_at = timezone.now()
                 booking.save()
 
+                # Process financial transactions (Commission & Payout)
+                try:
+                    FinancialService.process_commission(booking)
+                    FinancialService.process_payout(booking)
+                except Exception as e:
+                    logger.error(f"Error processing financial transactions for booking {booking.id}: {str(e)}")
+
                 # Send confirmation emails
                 self._send_payment_emails(booking, payment, request.user)
 
@@ -332,6 +298,13 @@ class StripeWebhookView(APIView):
                         booking.payment_status = "succeeded"
                         booking.payment_completed_at = timezone.now()
                         booking.save()
+
+                        # Process financial transactions (Commission & Payout)
+                        try:
+                            FinancialService.process_commission(booking)
+                            FinancialService.process_payout(booking)
+                        except Exception as e:
+                            logger.error(f"Error processing financial transactions for booking {booking_id} via webhook: {str(e)}")
                         
                         logger.info(f"Booking {booking_id} payment confirmed via webhook")
                     except (Booking.DoesNotExist, Payment.DoesNotExist) as e:
@@ -369,6 +342,12 @@ class StripeWebhookView(APIView):
                     booking.status = Booking.Status.CANCELLED
                     booking.payment_status = "refunded"
                     booking.save()
+
+                    # Process financial transactions (Internal Refund)
+                    try:
+                        FinancialService.process_refund(booking)
+                    except Exception as e:
+                        logger.error(f"Error processing internal refund for booking {booking.id} via webhook: {str(e)}")
                     
                     logger.info(f"Booking {booking.id} refunded via webhook")
                 except Payment.DoesNotExist:
@@ -447,6 +426,12 @@ class RefundPaymentView(APIView):
                 booking.status = Booking.Status.CANCELLED
                 booking.payment_status = "refunded"
                 booking.save()
+
+                # Process financial transactions (Internal Refund)
+                try:
+                    FinancialService.process_refund(booking)
+                except Exception as e:
+                    logger.error(f"Error processing internal refund for booking {booking.id}: {str(e)}")
 
                 # Send refund emails
                 self._send_refund_emails(booking, payment, reason)

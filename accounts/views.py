@@ -3,26 +3,22 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-
-from accounts.serializers import GoogleLoginSerializer
-
-
 from rest_framework_simplejwt.views import TokenObtainPairView
+from django.db.models import Count, Sum
+from django.core.mail import send_mail
+from django.conf import settings
 
-from accounts.models import User
+from accounts.models import User, SavedItem
 from accounts.serializers import (
     UserRegisterSerializer,
+    UserSerializer,
+    SavedItemSerializer,
     VerifyEmailSerializer,
     CustomTokenObtainPairSerializer,
+    GoogleLoginSerializer,
 )
 from accounts.permissions import IsAdmin
-
-
 from accounts.services import AccountService, SavedItemService
-from accounts.permissions import IsAdmin
-
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -76,7 +72,6 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def set_password(self, request):
-        from .serializers import SetPasswordSerializer
         from rest_framework_simplejwt.tokens import RefreshToken
 
         serializer = SetPasswordSerializer(data=request.data)
@@ -112,9 +107,6 @@ class GoogleLoginView(APIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
-
-from accounts.serializers import SavedItemSerializer, UserSerializer
-from accounts.models import SavedItem
 
 class SavedItemViewSet(viewsets.ModelViewSet):
     serializer_class = SavedItemSerializer
@@ -157,11 +149,6 @@ class SavedItemViewSet(viewsets.ModelViewSet):
         if removed:
             return Response({'message': 'Item removed'}, status=status.HTTP_200_OK)
         return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-
-from django.core.mail import send_mail
-from django.conf import settings
 
 class ContactView(APIView):
     permission_classes = [AllowAny]

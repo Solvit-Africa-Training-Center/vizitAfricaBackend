@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 
+
 class Vendor(models.Model):
     class VendorType(models.TextChoices):
         HOTEL = 'hotel', 'Hotel/Accommodation'
@@ -21,8 +22,8 @@ class Vendor(models.Model):
     address = models.CharField(max_length=255, blank=True)
     website = models.URLField(blank=True, null=True)
     vendor_type = models.CharField(
-        max_length=50, 
-        choices=VendorType.choices, 
+        max_length=50,
+        choices=VendorType.choices,
         default=VendorType.OTHER,
         db_index=True
     )
@@ -33,10 +34,13 @@ class Vendor(models.Model):
         db_index=True
     )
     is_system_user = models.BooleanField(default=True, help_text="True if they can log in to the dashboard")
-    
+
     is_approved = models.BooleanField(default=False, db_index=True)
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_vendors")
     approved_on = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.business_name} ({self.get_vendor_type_display()})"

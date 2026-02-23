@@ -13,9 +13,9 @@ class FinancialService:
 
     @staticmethod
     def process_commission(booking: Booking, rate: Decimal = None) -> Transaction:
-        """Calculate and create commission transaction for a confirmed booking."""
-        if booking.status != 'confirmed':
-            raise ValidationError("Commission can only be processed for confirmed bookings.")
+        """Calculate and create commission transaction for a paid booking."""
+        if booking.status != Booking.Status.PAID:
+            raise ValidationError("Commission can only be processed for paid bookings.")
             
         if Transaction.objects.filter(booking=booking, transaction_type='commission').exists():
             return None # Already processed
@@ -36,8 +36,8 @@ class FinancialService:
     @transaction.atomic
     def process_refund(booking: Booking) -> Transaction:
         """Process full refund for a booking and cancel it."""
-        if booking.status != 'confirmed':
-            raise ValidationError("Only confirmed bookings can be refunded.")
+        if booking.status not in [Booking.Status.PAID, Booking.Status.COMPLETED]:
+            raise ValidationError("Only paid or completed bookings can be refunded.")
             
         if Transaction.objects.filter(booking=booking, transaction_type='refund').exists():
             raise ValidationError("Booking already refunded.")
@@ -53,7 +53,7 @@ class FinancialService:
         )
         
         # Update booking status
-        booking.status = 'cancelled'
+        booking.status = Booking.Status.CANCELLED
         booking.save()
         
         # Cancel items
@@ -64,8 +64,8 @@ class FinancialService:
     @staticmethod
     def process_payout(booking: Booking) -> Transaction:
         """Calculate and process payout to vendor."""
-        if booking.status != 'confirmed':
-             raise ValidationError("Payout can only be processed for confirmed bookings.")
+        if booking.status != Booking.Status.PAID:
+             raise ValidationError("Payout can only be processed for paid bookings.")
 
         if Transaction.objects.filter(booking=booking, transaction_type='payout').exists():
             return None # Already processed

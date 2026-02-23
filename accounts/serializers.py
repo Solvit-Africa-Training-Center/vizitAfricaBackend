@@ -1,16 +1,13 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
 from accounts.models import User, VerificationCode, SavedItem
 from accounts.utils.code_generator import generate_verification_code
 from accounts.utils.send_email import send_verification_email
-from google.oauth2 import id_token
-from google.auth.transport import requests
-from rest_framework import serializers
-from django.conf import settings
-from rest_framework_simplejwt.tokens import RefreshToken
-
-from accounts.models import User
 
 
 
@@ -160,12 +157,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 "Account not activated. Please verify your email."
             )
 
-        data["user"] = {
-            "id": str(self.user.id),
-            "email": self.user.email,
-            "full_name": self.user.full_name,
-            "role": self.user.role,
-        }
+        data["user"] = UserSerializer(self.user).data
 
         return data
 
@@ -194,8 +186,8 @@ class GoogleLoginSerializer(serializers.Serializer):
             email=email,
             defaults={
                 "full_name": full_name,
-                "phone_number": "",  # Placeholder, user should update profile
-                "is_active": True, 
+                "phone_number": "",
+                "is_active": True,
             },
         )
 
@@ -208,12 +200,7 @@ class GoogleLoginSerializer(serializers.Serializer):
         return {
             "refresh": str(refresh),
             "access": str(refresh.access_token),
-            "user": {
-                "id": str(user.id),
-                "email": user.email,
-                "full_name": user.full_name,
-                "role": user.role,
-            },
+            "user": UserSerializer(user).data,
         }
 
 
