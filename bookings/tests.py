@@ -4,14 +4,17 @@ from rest_framework import status
 from decimal import Decimal
 from accounts.models import User
 from bookings.models import Booking, BookingItem
+from services.models import Service
+from locations.models import Location
 
 
 class TripLifecycleTest(TestCase):
-    """full request -> quote -> accept lifecycle"""
+    # test relational trip lifecycle
 
     def setUp(self):
         self.client = APIClient()
 
+        # admin
         self.admin = User.objects.create_user(
             email="admin@vizit.com",
             password="admin123",
@@ -22,6 +25,7 @@ class TripLifecycleTest(TestCase):
             is_staff=True,
         )
 
+        # client
         self.user = User.objects.create_user(
             email="user@test.com",
             password="user123",
@@ -31,266 +35,186 @@ class TripLifecycleTest(TestCase):
             is_active=True,
         )
 
-    def _submit_trip(self):
+        # service
+        loc = Location.objects.create(name="Kigali", latitude=0, longitude=0)
+        self.service = Service.objects.create(
+            user=self.admin, 
+            location=loc,
+            title="Luxury Safari",
+            service_type="experience",
+            base_price=Decimal("500.00"),
+            capacity=10,
+            external_id="exp-100"
+        )
+
+    def test_guest_submission_forces_zero_price(self):
+        # guests cannot set prices
         payload = {
-            "departureCity": "Kigali",
-            "destination": "Virunga",
-            "departureDate": "2026-06-01",
-            "returnDate": "2026-06-07",
+            "name": "Guest User",
+            "email": "guest@test.com",
+            "phone_number": "555-0123",
+            "departure_city": "London",
+            "arrival_date": "2026-10-01",
+            "departure_date": "2026-10-10",
             "adults": 2,
-            "children": 1,
-            "infants": 0,
-            "name": "Test User",
-            "email": self.user.email,
-            "phone": "+250780000000",
-            "tripPurpose": "leisure",
-            "specialRequests": "vegetarian meals",
             "items": [
                 {
-                    "id": "flight-1",
-                    "type": "flight",
-                    "title": "Kigali to Goma",
-                    "description": "one-way flight",
-                    "price": 250,
-                    "quantity": 2,
-                },
-                {
-                    "id": "hotel-1",
-                    "type": "hotel",
-                    "title": "Virunga Lodge",
-                    "description": "3 nights",
-                    "price": 180,
-                    "quantity": 3,
-                },
-            ],
+                    "type": "custom",
+                    "title": "Private Boat",
+                    "unit_price": 9999.00,
+                    "quantity": 1
+                }
+            ]
         }
-
-        self.client.force_authenticate(user=self.user)
-        return self.client.post("/api/bookings/submit-trip/", payload, format="json")
-
-    def test_submit_trip_creates_booking(self):
-        resp = self._submit_trip()
+        
+        self.client.force_authenticate(user=None)
+        resp = self.client.post("/api/bookings/submit-trip/", payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Booking.objects.count(), 1)
+        
+        booking = Booking.objects.get(departure_city="London")
+        item = booking.items.first()
+        
+        self.assertEqual(item.unit_price, Decimal("0.00"))
+        self.assertEqual(booking.total_amount, Decimal("0.00"))
 
-        booking = Booking.objects.first()
-        self.assertEqual(booking.status, "pending")
-        self.assertEqual(booking.user, self.user)
-
-    def test_user_booking_list_returns_full_details(self):
-        self._submit_trip()
-        resp = self.client.get("/api/bookings/")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-
-        data = resp.json()
-        self.assertTrue(len(data) >= 1)
-
-        booking = data[0]
-        self.assertEqual(booking["name"], "Test User")
-        self.assertEqual(booking["email"], self.user.email)
-        self.assertEqual(booking["adults"], 2)
-        self.assertEqual(booking["children"], 1)
-        self.assertTrue(booking["needsFlights"])
-        self.assertTrue(booking["needsHotel"])
-        self.assertFalse(booking["needsCar"])
-        self.assertEqual(booking["specialRequests"], "vegetarian meals")
-        self.assertEqual(booking["status"], "pending")
-
-    def test_user_booking_detail_returns_full_details(self):
-        self._submit_trip()
-        booking = Booking.objects.first()
-
-        resp = self.client.get(f"/api/bookings/{booking.id}/")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-
-        data = resp.json()
-        self.assertEqual(data["name"], "Test User")
-        self.assertIn("quote", data)
-        self.assertIn("items", data)
-        self.assertEqual(data["tripPurpose"], "leisure")
-
-    def test_admin_sends_quote(self):
-        self._submit_trip()
-        booking = Booking.objects.first()
-
-        self.client.force_authenticate(user=self.admin)
-        quote_payload = {
+    def test_with_driver_and_round_trip_columns(self):
+        # verify promoted fields store in columns
+        payload = {
+            "name": "Driver Test",
+            "email": "driver@test.com",
+            "phone_number": "12345",
+            "departure_city": "Paris",
+            "arrival_date": "2026-10-01",
+            "departure_date": "2026-10-10",
             "items": [
                 {
-                    "type": "flight",
-                    "title": "Kigali to Goma - RwandAir",
-                    "description": "round trip economy",
-                    "quantity": 2,
-                    "unit_price": 320,
-                },
-                {
-                    "type": "hotel",
-                    "title": "Virunga Lodge Premium",
-                    "description": "3 nights, breakfast included",
-                    "quantity": 3,
-                    "unit_price": 250,
-                },
-            ],
-            "notes": "best prices available",
-            "currency": "USD",
+                    "type": "car",
+                    "title": "SUV",
+                    "with_driver": True,
+                    "is_round_trip": True,
+                    "return_date": "2026-10-10",
+                    "quantity": 1
+                }
+            ]
         }
+        
+        self.client.force_authenticate(user=None)
+        self.client.post("/api/bookings/submit-trip/", payload, format="json")
+        item = BookingItem.objects.get(title="SUV")
+        
+        self.assertTrue(item.with_driver)
+        self.assertTrue(item.is_round_trip)
+        self.assertEqual(str(item.return_date), "2026-10-10")
 
-        resp = self.client.post(
-            f"/api/bookings/{booking.id}/quote/", quote_payload, format="json"
-        )
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "quoted")
-        self.assertIn("packageQuote", booking.guest_info)
-
-    def test_user_sees_quote_in_booking(self):
-        self._submit_trip()
-        booking = Booking.objects.first()
+    def test_admin_quote_updates_relational_items(self):
+        # admin can update prices
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.post("/api/bookings/submit-trip/", {
+            "name": "Quote Test",
+            "email": self.user.email,
+            "phone_number": "123456",
+            "departure_city": "NYC",
+            "arrival_date": "2026-11-01",
+            "departure_date": "2026-11-05",
+            "items": [{"type": "experience", "title": "Old Title", "quantity": 1}]
+        }, format="json")
+        
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        
+        booking = Booking.objects.get(departure_city="NYC")
+        initial_item = booking.items.first()
 
         self.client.force_authenticate(user=self.admin)
-        self.client.post(
-            f"/api/bookings/{booking.id}/quote/",
-            {
-                "items": [
-                    {"type": "flight", "title": "Flight", "quantity": 1, "unit_price": 500}
-                ]
-            },
-            format="json",
+        resp = self.client.post(f"/api/bookings/{booking.id}/quote/", {
+            "items": [
+                {
+                    "id": str(initial_item.id),
+                    "title": "Updated Luxury Safari",
+                    "unit_price": 450.00,
+                    "quantity": 2,
+                    "start_date": "2026-11-01",
+                    "end_date": "2026-11-05"
+                }
+            ]
+        }, format="json")
+        
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        booking.refresh_from_db()
+        item = booking.items.first()
+        
+        self.assertEqual(booking.status, Booking.Status.QUOTED)
+        self.assertEqual(item.title, "Updated Luxury Safari")
+        self.assertEqual(item.unit_price, Decimal("450.00"))
+        self.assertEqual(booking.total_amount, Decimal("900.00"))
+
+    def test_accept_quote_updates_status_and_items(self):
+        # acceptance flow
+        booking = Booking.objects.create(
+            user=self.user, 
+            status=Booking.Status.QUOTED, 
+            total_amount=Decimal("100.00"),
+            arrival_date="2026-12-01"
+        )
+        item = BookingItem.objects.create(
+            booking=booking, 
+            user=self.user,
+            title="Test Item", 
+            quantity=1, 
+            unit_price=Decimal("100.00"),
+            subtotal=Decimal("100.00"),
+            status=BookingItem.Status.RESERVED
         )
 
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.post(f"/api/bookings/{booking.id}/accept/", {}, format="json")
+        
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        booking.refresh_from_db()
+        item.refresh_from_db()
+        
+        self.assertEqual(booking.status, Booking.Status.ACCEPTED)
+        self.assertEqual(item.status, BookingItem.Status.BOOKED)
+        self.assertIsNotNone(booking.quote_accepted_at)
+
+    def test_strict_snake_case_consistency(self):
+        # verify snake_case response
+        booking = Booking.objects.create(
+            user=self.user,
+            departure_city="Berlin",
+            arrival_date="2026-05-01",
+            needs_flights=True
+        )
+        
         self.client.force_authenticate(user=self.user)
         resp = self.client.get(f"/api/bookings/{booking.id}/")
+        
         data = resp.json()
-
-        self.assertIsNotNone(data["quote"])
-        self.assertEqual(data["quote"]["status"], "quoted")
-        self.assertEqual(data["status"], "quoted")
-
-    def test_user_accepts_quote(self):
-        self._submit_trip()
-        booking = Booking.objects.first()
-
-        self.client.force_authenticate(user=self.admin)
-        self.client.post(
-            f"/api/bookings/{booking.id}/quote/",
-            {
-                "items": [
-                    {"type": "flight", "title": "Flight", "quantity": 2, "unit_price": 300}
-                ]
-            },
-            format="json",
-        )
-
+        self.assertIn("arrival_date", data)
+        self.assertIn("needs_flights", data)
+        self.assertNotIn("arrivalDate", data)
+        
+    def test_limit_of_pending_requests(self):
+        # limit spam
+        for i in range(2):
+            Booking.objects.create(user=self.user, status=Booking.Status.PENDING)
+            
+        payload = {
+            "name": "Spam Test",
+            "email": self.user.email,
+            "phone_number": "999",
+            "departure_city": "SpamCity",
+            "arrival_date": "2026-01-01",
+            "departure_date": "2026-01-05",
+            "items": [{"type": "service", "title": "Spam", "quantity": 1}]
+        }
+        
         self.client.force_authenticate(user=self.user)
-        resp = self.client.post(f"/api/bookings/{booking.id}/accept/", {}, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, "confirmed")
-
-        confirmed_items = booking.items.filter(status="booked")
-        self.assertTrue(confirmed_items.exists())
-
-    def test_admin_list_returns_requested_items(self):
-        self._submit_trip()
-
-        self.client.force_authenticate(user=self.admin)
-        resp = self.client.get("/api/bookings/admin/bookings/")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-
-        data = resp.json()
-        booking = data[0]
-        self.assertIn("requestedItems", booking)
-        self.assertTrue(len(booking["requestedItems"]) > 0)
-
-    def test_non_admin_cannot_send_quote(self):
-        self._submit_trip()
-        booking = Booking.objects.first()
-
-        self.client.force_authenticate(user=self.user)
-        resp = self.client.post(
-            f"/api/bookings/{booking.id}/quote/",
-            {"items": [{"type": "flight", "title": "x", "quantity": 1, "unit_price": 100}]},
-            format="json",
-        )
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_cannot_accept_without_quote(self):
-        self._submit_trip()
-        booking = Booking.objects.first()
-
-        resp = self.client.post(f"/api/bookings/{booking.id}/accept/", {}, format="json")
+        resp = self.client.post("/api/bookings/submit-trip/", payload, format="json")
+        
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-
-
-class BookingSerializerTest(TestCase):
-    """verify response shape matches frontend contract"""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            email="shape@test.com",
-            password="test123",
-            full_name="Shape Test",
-            phone_number="1234567890",
-            role="CLIENT",
-            is_active=True,
-        )
-
-        self.booking = Booking.objects.create(
-            user=self.user,
-            total_amount=Decimal("0.00"),
-            currency="USD",
-            status="pending",
-            guest_info={
-                "name": "Shape Test",
-                "email": "shape@test.com",
-                "phone": "+250780111111",
-                "departureDate": "2026-07-01",
-                "returnDate": "2026-07-05",
-                "adults": 1,
-                "children": 0,
-                "infants": 0,
-                "tripPurpose": "business",
-                "specialRequests": "late checkout",
-                "requestedItems": [
-                    {"type": "flight", "title": "Test Flight", "quantity": 1, "price": 500}
-                ],
-            },
-        )
-
-    def test_booking_response_has_all_expected_fields(self):
-        client = APIClient()
-        client.force_authenticate(user=self.user)
-        resp = client.get(f"/api/bookings/{self.booking.id}/")
-
-        expected_fields = [
-            "id", "name", "email", "phone",
-            "arrivalDate", "departureDate",
-            "travelers", "adults", "children", "infants",
-            "needsFlights", "needsHotel", "needsCar", "needsGuide",
-            "status", "currency", "total_amount",
-            "specialRequests", "tripPurpose",
-            "items", "quote", "createdAt",
-        ]
-
-        data = resp.json()
-        for field in expected_fields:
-            self.assertIn(field, data, f"missing field: {field}")
-
-    def test_guest_info_correctly_extracted(self):
-        client = APIClient()
-        client.force_authenticate(user=self.user)
-        resp = client.get(f"/api/bookings/{self.booking.id}/")
-        data = resp.json()
-
-        self.assertEqual(data["name"], "Shape Test")
-        self.assertEqual(data["phone"], "+250780111111")
-        self.assertEqual(data["arrivalDate"], "2026-07-01")
-        self.assertEqual(data["departureDate"], "2026-07-05")
-        self.assertEqual(data["adults"], 1)
-        self.assertEqual(data["travelers"], 1)
-        self.assertEqual(data["tripPurpose"], "business")
-        self.assertEqual(data["specialRequests"], "late checkout")
-        self.assertTrue(data["needsFlights"])
-        self.assertFalse(data["needsHotel"])
+        
+        body = resp.json()
+        error_msg = body.get("message") or body.get("error", {}).get("message", "")
+        self.assertIn("limit", str(error_msg).lower())

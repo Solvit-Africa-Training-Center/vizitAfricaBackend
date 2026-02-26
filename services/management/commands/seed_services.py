@@ -566,48 +566,28 @@ class Command(BaseCommand):
         if not client: return
 
         # 1. Complex Trip Request (Pending)
-        guest_info = {
-            "name": client.full_name,
-            "email": client.email,
-            "phone": client.phone_number,
-            "destination": "Kigali & Volcanoes",
-            "departureCity": "Paris",
-            "departureDate": (timezone.now() + timedelta(days=30)).date().isoformat(),
-            "returnDate": (timezone.now() + timedelta(days=40)).date().isoformat(),
-            "adults": 2,
-            "children": 1,
-            "infants": 1,
-            "tripPurpose": "honeymoon",
-            "needsFlights": True,
-            "needsHotel": True,
-            "needsCar": True,
-            "needsGuide": True,
-            "requestedItems": [
-                {
-                    "type": "hotel",
-                    "title": "The Retreat by Heaven",
-                    "quantity": 1,
-                    "metadata": {"room_type": "Luxury Suite"}
-                }
-            ]
-        }
+        arrival_date = (timezone.now() + timedelta(days=30)).date()
+        departure_date = (timezone.now() + timedelta(days=40)).date()
         
-        booking, _ = Booking.objects.get_or_create(
+        booking, created = Booking.objects.get_or_create(
             user=client,
-            status="pending",
+            status=Booking.Status.PENDING,
             defaults={
+                "departure_city": "Paris",
+                "destination": "Kigali & Volcanoes",
+                "arrival_date": arrival_date,
+                "departure_date": departure_date,
+                "adults": 2,
+                "children": 1,
+                "infants": 1,
+                "needs_flights": True,
+                "needs_hotel": True,
+                "needs_car": True,
+                "needs_guide": True,
+                "phone_number": client.phone_number,
+                "trip_purpose": "honeymoon",
+                "special_requests": "We love quiet rooms and local food.",
                 "total_amount": Decimal("0.00"),
-                "guest_info": guest_info
-            }
-        )
-
-        # 2. Detailed Confirmed Booking with Timing
-        confirmed_booking, created = Booking.objects.get_or_create(
-            user=client,
-            status="confirmed",
-            defaults={
-                "total_amount": Decimal("1500.00"),
-                "currency": "USD"
             }
         )
 
@@ -615,17 +595,47 @@ class Command(BaseCommand):
             hotel_service = next((s for s in services if s.service_type == "hotel"), None)
             if hotel_service:
                 BookingItem.objects.create(
-                    booking=confirmed_booking,
+                    booking=booking,
                     user=client,
                     service=hotel_service,
                     item_type="hotel",
                     title=hotel_service.title,
-                    start_date=timezone.now().date() + timedelta(days=10),
-                    end_date=timezone.now().date() + timedelta(days=12),
-                    start_time="14:00:00",
-                    end_time="11:00:00",
+                    description=hotel_service.description,
+                    start_date=arrival_date,
+                    end_date=arrival_date + timedelta(days=3),
                     quantity=1,
-                    unit_price=hotel_service.base_price,
-                    subtotal=hotel_service.base_price,
-                    status="booked"
+                    unit_price=Decimal("0.00"),
+                    subtotal=Decimal("0.00"),
+                    status=BookingItem.Status.RESERVED
+                )
+
+        # 2. Detailed Confirmed Booking
+        confirmed_booking, created = Booking.objects.get_or_create(
+            user=client,
+            status=Booking.Status.PAID,
+            defaults={
+                "departure_city": "New York",
+                "destination": "Akagera Safari",
+                "arrival_date": timezone.now().date() + timedelta(days=10),
+                "departure_date": timezone.now().date() + timedelta(days=15),
+                "adults": 2,
+                "total_amount": Decimal("900.00"),
+            }
+        )
+
+        if created:
+            safari_service = next((s for s in services if s.service_type == "experience"), None)
+            if safari_service:
+                BookingItem.objects.create(
+                    booking=confirmed_booking,
+                    user=client,
+                    service=safari_service,
+                    item_type="experience",
+                    title=safari_service.title,
+                    start_date=confirmed_booking.arrival_date,
+                    end_date=confirmed_booking.arrival_date,
+                    quantity=2,
+                    unit_price=safari_service.base_price,
+                    subtotal=safari_service.base_price * 2,
+                    status=BookingItem.Status.BOOKED
                 )

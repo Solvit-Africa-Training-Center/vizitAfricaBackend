@@ -55,6 +55,37 @@ class Command(BaseCommand):
             is_active=True
         )
 
+        # 3. Create Regular User
+        self.stdout.write("Creating regular user...")
+        User.objects.create_user(
+            email="user@vizit.africa",
+            password="password123",
+            full_name="Vizit Africa User",
+            phone_number="+250781111111",
+            role="CLIENT",
+            is_active=True
+        )
+
+        # 4. Create Vendor
+        self.stdout.write("Creating vendor...")
+        vendor_user = User.objects.create_user(
+            email="vendor@vizit.africa",
+            password="password123",
+            full_name="Vizit Africa Vendor",
+            phone_number="+250782222222",
+            role="VENDOR",
+            is_active=True
+        )
+        Vendor.objects.create(
+            user=vendor_user,
+            business_name="Vizit Africa Vendor Ltd",
+            vendor_type="guide",
+            status="active",
+            is_approved=True
+        )
+
         self.stdout.write(self.style.SUCCESS("Database reset successfully!"))
         self.stdout.write(self.style.WARNING("Access Credentials:"))
-        self.stdout.write("  Admin: admin@vizit.africa / password123")
+        self.stdout.write("  Admin:  admin@vizit.africa  / password123")
+        self.stdout.write("  User:   user@vizit.africa   / password123")
+        self.stdout.write("  Vendor: vendor@vizit.africa / password123")

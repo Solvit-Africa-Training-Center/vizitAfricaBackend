@@ -26,7 +26,7 @@ class CreatePaymentIntentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        booking_id = request.data.get("booking_id")
+        booking_id = request.data.get("booking_id") or request.data.get("id")
         
         if not booking_id:
             return Response(
@@ -368,7 +368,7 @@ class RefundPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        booking_id = request.data.get("booking_id")
+        booking_id = request.data.get("booking_id") or request.data.get("id")
         reason = request.data.get("reason", "Customer requested refund")
         
         if not booking_id:

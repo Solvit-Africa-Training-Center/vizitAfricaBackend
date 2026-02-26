@@ -16,6 +16,7 @@ from accounts.serializers import (
     VerifyEmailSerializer,
     CustomTokenObtainPairSerializer,
     GoogleLoginSerializer,
+    SetPasswordSerializer,
 )
 from accounts.permissions import IsAdmin
 from accounts.services import AccountService, SavedItemService
@@ -70,11 +71,20 @@ class UserViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=False, methods=["post"], permission_classes=[AllowAny])
-    def set_password(self, request):
+    @action(
+        detail=False, 
+        methods=["post"], 
+        permission_classes=[AllowAny],
+        url_path='set_password/(?P<uidb64>[^/.]+)/(?P<token>[^/.]+)'
+    )
+    def set_password(self, request, uidb64=None, token=None):
         from rest_framework_simplejwt.tokens import RefreshToken
 
-        serializer = SetPasswordSerializer(data=request.data)
+        data = request.data.copy()
+        data["uidb64"] = uidb64
+        data["token"] = token
+
+        serializer = SetPasswordSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 

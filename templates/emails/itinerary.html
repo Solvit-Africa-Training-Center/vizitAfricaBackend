@@ -23,31 +23,31 @@
       width="100%"
       cellpadding="0"
       cellspacing="0"
-      style="background-color: #f8f9fa; padding: 40px 20px"
+      style="background-color: #f8f9fa; padding: 20px 10px"
     >
       <tr>
         <td align="center">
           <table
-            width="600"
+            width="750"
             cellpadding="0"
             cellspacing="0"
             style="
               background-color: #ffffff;
               border: 1px solid #e5e7eb;
-              border-radius: 4px;
+              border-radius: 8px;
               overflow: hidden;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+              box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
             "
           >
             <tr>
-              <td style="padding: 48px 40px; text-align: left">
-                <div style="margin-bottom: 32px">
+              <td style="padding: 40px; text-align: left">
+                <div style="margin-bottom: 24px">
                   <span
                     style="
-                      font-size: 20px;
-                      font-weight: 600;
+                      font-size: 24px;
+                      font-weight: 700;
                       color: #2d4685;
-                      letter-spacing: -0.01em;
+                      letter-spacing: -0.02em;
                     "
                     >Vizit Africa</span
                   >
@@ -55,123 +55,131 @@
                 <h1
                   style="
                     color: #111827;
-                    margin: 0 0 16px 0;
-                    font-size: 28px;
-                    font-weight: 500;
-                    letter-spacing: -0.02em;
+                    margin: 0 0 12px 0;
+                    font-size: 32px;
+                    font-weight: 600;
+                    letter-spacing: -0.03em;
                   "
                 >
-                  Your Journey Plan
+                  Your Adventure Awaits
                 </h1>
                 <p
                   style="
                     color: #4b5563;
-                    font-size: 16px;
+                    font-size: 17px;
                     line-height: 1.6;
                     margin: 0 0 32px 0;
                   "
                 >
-                  Hello {{ guest_name }}, we've received your trip request. Our
-                  specialists are now sourcing the best real-time options for
-                  your selected experiences.
+                  Hello {{ guest_name }}, we've received your journey plan. Our
+                  team is now curating the perfect itinerary based on your
+                  preferences. Here is a summary of your requested experiences:
                 </p>
 
                 <div style="margin-bottom: 40px">
                   <div
                     style="
-                      font-size: 14px;
-                      font-weight: 600;
-                      color: #111827;
+                      font-size: 12px;
+                      font-weight: 700;
+                      color: #2d4685;
                       text-transform: uppercase;
-                      letter-spacing: 0.05em;
-                      border-bottom: 2px solid #2d4685;
+                      letter-spacing: 0.1em;
+                      border-bottom: 1px solid #e5e7eb;
                       padding-bottom: 8px;
-                      display: inline-block;
+                      margin-bottom: 16px;
                     "
                   >
-                    Proposed Itinerary
+                    Itinerary Summary
                   </div>
-                  <div style="margin-top: 8px">
+                  <div>
                     {% for item in items %}
                     <div
-                      style="padding: 24px 0; border-bottom: 1px solid #f3f4f6"
+                      style="padding: 20px 0; border-bottom: 1px solid #f3f4f6"
                     >
-                      <div
-                        style="
-                          color: #2d4685;
-                          font-size: 11px;
-                          font-weight: 700;
-                          text-transform: uppercase;
-                          letter-spacing: 0.1em;
-                          margin-bottom: 8px;
-                        "
-                      >
-                        {{ item.type|default:'SERVICE' }}
-                      </div>
-                      <div
-                        style="
-                          color: #111827;
-                          font-size: 18px;
-                          font-weight: 500;
-                          margin-bottom: 4px;
-                        "
-                      >
-                        {{ item.title|default:'Trip Experience' }}
-                      </div>
-                      <div
-                        style="
-                          color: #6b7280;
-                          font-size: 14px;
-                          margin-bottom: 12px;
-                          line-height: 1.5;
-                        "
-                      >
-                        {{ item.description|default:'' }}
-                      </div>
-                      <div
-                        style="
-                          color: #111827;
-                          font-size: 14px;
-                          font-weight: 600;
-                        "
-                      >
-                        Est. Price: {% if item.price %}${{ item.price }}{% else
-                        %}Flexible{% endif %}
-                      </div>
+                      <table width="100%">
+                        <tr>
+                          <td>
+                            <div
+                              style="
+                                color: #6b7280;
+                                font-size: 11px;
+                                font-weight: 700;
+                                text-transform: uppercase;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              {{ item.type|default:'SERVICE' }}
+                            </div>
+                            <div
+                              style="
+                                color: #111827;
+                                font-size: 18px;
+                                font-weight: 600;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              {{ item.title|default:'Trip Experience' }}
+                            </div>
+                            <div
+                              style="
+                                color: #6b7280;
+                                font-size: 14px;
+                                line-height: 1.5;
+                              "
+                            >
+                              {{ item.description|default:'' }}
+                            </div>
+                          </td>
+                          <td align="right" valign="top" style="width: 120px;">
+                            <div
+                              style="
+                                color: #111827;
+                                font-size: 15px;
+                                font-weight: 700;
+                              "
+                            >
+                              {% if item.price %}${{ item.price }}{% else
+                              %}Requesting...{% endif %}
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
                     </div>
                     {% endfor %}
                   </div>
                 </div>
 
+                {% if password_link %}
                 <div
                   style="
-                    background-color: #f9fafb;
-                    border-radius: 4px;
+                    background-color: #f3f4f6;
+                    border-radius: 8px;
                     padding: 32px;
                     text-align: center;
+                    border: 1px dashed #d1d5db;
                   "
                 >
                   <h3
                     style="
                       color: #111827;
                       margin: 0 0 12px 0;
-                      font-size: 18px;
-                      font-weight: 500;
+                      font-size: 20px;
+                      font-weight: 600;
                     "
                   >
-                    Complete your profile
+                    Secure your journey
                   </h3>
                   <p
                     style="
                       color: #4b5563;
-                      font-size: 14px;
+                      font-size: 15px;
                       line-height: 1.6;
                       margin: 0 0 24px 0;
                     "
                   >
-                    Set your password now to track your request, view your
-                    finalized quote, and manage your travel documents in your
-                    dashboard.
+                    Set a password to access your private dashboard where you
+                    can track your request, communicate with your specialist,
+                    and finalize your trip.
                   </p>
                   <a
                     href="{{ password_link }}"
@@ -179,17 +187,30 @@
                       background-color: #2d4685;
                       color: #ffffff;
                       text-decoration: none;
-                      padding: 14px 28px;
-                      border-radius: 4px;
+                      padding: 16px 32px;
+                      border-radius: 6px;
                       display: inline-block;
-                      font-size: 14px;
-                      font-weight: 600;
-                      text-transform: uppercase;
-                      letter-spacing: 0.05em;
+                      font-size: 15px;
+                      font-weight: 700;
+                      letter-spacing: 0.02em;
                     "
-                    >Set Account Password</a
+                    >Set Password & Access Dashboard</a
                   >
                 </div>
+                {% else %}
+                <div style="text-align: center; padding: 20px;">
+                  <a
+                    href="{{ frontend_url|default:'#' }}/en/profile"
+                    style="
+                      color: #2d4685;
+                      text-decoration: underline;
+                      font-size: 15px;
+                      font-weight: 600;
+                    "
+                    >Track your request in your dashboard →</a
+                  >
+                </div>
+                {% endif %}
               </td>
             </tr>
             <tr>
@@ -197,19 +218,20 @@
                 style="
                   background-color: #f9fafb;
                   padding: 32px 40px;
-                  text-align: left;
+                  text-align: center;
+                  border-top: 1px solid #e5e7eb;
                 "
               >
                 <p
                   style="
                     color: #9ca3af;
-                    font-size: 12px;
+                    font-size: 13px;
                     margin: 0;
-                    line-height: 1.5;
+                    line-height: 1.6;
                   "
                 >
-                  © 2024 Vizit Africa Logistics. All rights reserved.<br />
-                  Global standards, local expertise.
+                  © 2026 Vizit Africa Logistics. All rights reserved.<br />
+                  Global standards, local expertise. Built for the modern traveler.
                 </p>
               </td>
             </tr>
