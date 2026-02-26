@@ -2,11 +2,11 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     CreateBookingItemView, UpdateBookingItemView, BookingItemListView,
-    ConfirmBookingView, BookingListView, BookingDetailView, TripSubmissionView, 
-    generate_ticket, download_ticket, verify_ticket, process_commission, 
-    transaction_history, process_refund, vendor_payouts, process_payout, 
+    ConfirmBookingView, BookingListView, BookingDetailView, TripSubmissionView,
+    generate_ticket, download_ticket, verify_ticket, process_commission,
+    transaction_history, vendor_payouts, process_payout,
     AdminBookingListView, AdminBookingDetailView, PackageViewSet, PackageItemViewSet,
-    send_quote, accept_quote
+    send_quote, accept_quote, cancel_booking, notify_vendor
 )
 
 router = DefaultRouter()
@@ -34,14 +34,18 @@ urlpatterns = [
     # Transactions
     path('<uuid:booking_id>/commission/', process_commission, name='process-commission'),
     path('<uuid:booking_id>/payout/', process_payout, name='process-payout'),
-    path('<uuid:booking_id>/refund/', process_refund, name='process-refund'),
     path('transactions/', transaction_history, name='transaction-history'),
     path('vendor-payouts/', vendor_payouts, name='vendor-payouts'),
     
     # Admin
     path('admin/bookings/', AdminBookingListView.as_view(), name='admin-bookings-list'),
     path('admin/bookings/<uuid:pk>/', AdminBookingDetailView.as_view(), name='admin-booking-detail'),
-    path('admin/bookings/<uuid:booking_id>/send-quote/', send_quote, name='admin-booking-send-quote'),
-    path('<uuid:booking_id>/accept-quote/', accept_quote, name='booking-accept-quote'),
+    
+    # RESTful Quote Management
+    path('<uuid:booking_id>/quote/', send_quote, name='manage-quote'),
+    path('<uuid:booking_id>/accept/', accept_quote, name='accept-quote'),
+    path('<uuid:booking_id>/cancel/', cancel_booking, name='cancel-booking'),
+    path('<uuid:booking_id>/notify-vendor/', notify_vendor, name='notify-vendor'),
+
     path('', include(router.urls)),
 ]

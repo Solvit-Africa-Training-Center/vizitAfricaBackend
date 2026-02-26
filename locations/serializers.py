@@ -6,5 +6,5 @@ from .models import Location
 class LocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Location
-        fields = ['id', 'name', 'latitude', 'longitude']
-        read_only_fields = ['id']
+        fields = ['id', 'name', 'country', 'region', 'description', 'latitude', 'longitude', 'created_at']
+        read_only_fields = ['id', 'created_at']

@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'transactions',
     'vendors',
     'locations',
+    'core',
 
     "drf_spectacular",
 
@@ -104,7 +105,7 @@ DATABASES = {
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT'),
         'OPTIONS': {
-            'sslmode': 'require',  # Required for Aiven
+            'sslmode': config('DB_SSLMODE', default='require'),
             'connect_timeout': 10,
         },
         'CONN_MAX_AGE': 0,  # Don't persist connections
@@ -141,9 +142,9 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="NOT FOUND")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="NOT FOUND")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-# 🔹 Test print
-print("EMAIL_HOST_USER =", EMAIL_HOST_USER)
-print("EMAIL_HOST_PASSWORD =", "SET" if EMAIL_HOST_PASSWORD != "NOT FOUND" else "NOT FOUND")
+# Credentials should not be printed in production
+# print("EMAIL_HOST_USER =", EMAIL_HOST_USER)
+# print("EMAIL_HOST_PASSWORD =", "SET" if EMAIL_HOST_PASSWORD != "NOT FOUND" else "NOT FOUND")
 
 # Frontend URL for email links
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
@@ -166,7 +167,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
 AUTH_USER_MODEL = 'accounts.User'
 
 # REST Framework Configuration
@@ -178,6 +178,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'core.exception_handler.custom_exception_handler',
 }
 
 # JWT Configuration
@@ -195,7 +196,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # ENV~
@@ -212,7 +221,7 @@ CORS_ALLOWED_METHODS = [
     "DELETE",      
 ]
 
-CORS_ALLOWS_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True
 
 # Security Settings for Production
 if not DEBUG:
@@ -222,3 +231,8 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
+
+# Stripe Configuration
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="sk_test_placeholder")
+STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY", default="pk_test_placeholder")
+STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET", default="")

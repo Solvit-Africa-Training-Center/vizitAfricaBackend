@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+  <body
+    style="font-family: Arial, sans-serif; background: #f8f9fa; padding: 24px"
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="
+        max-width: 750px;
+        margin: 20px auto;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      "
+    >
+      <tr>
+        <td style="padding: 40px">
+          <div style="margin-bottom: 24px">
+            <span
+              style="
+                font-size: 20px;
+                font-weight: 700;
+                color: #2d4685;
+                letter-spacing: -0.01em;
+              "
+              >Vizit Africa</span
+            >
+          </div>
+          <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">
+            Your Official Quote is Ready
+          </h2>
+          <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 32px;">
+            Hello {{ guest_name }}, our specialists have finalized the pricing for your journey <strong>#{{ booking_id }}</strong>. Please review the details below.
+          </p>
+          <table
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            style="
+              margin-top: 16px;
+              border-collapse: collapse;
+              border-radius: 8px;
+              overflow: hidden;
+            "
+          >
+            <thead>
+              <tr style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
+                <th style="padding: 14px; text-align: left; font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase;">Service</th>
+                <th style="padding: 14px; text-align: center; font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase;">Qty</th>
+                <th style="padding: 14px; text-align: right; font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase;">Unit</th>
+                <th style="padding: 14px; text-align: right; font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              <tr style="border-bottom: 1px solid #f3f4f6;">
+                <td style="padding: 16px; font-size: 15px; color: #111827; font-weight: 500;">
+                  {{ item.title|default:'Service' }}
+                </td>
+                <td
+                  style="
+                    padding: 16px;
+                    text-align: center;
+                    font-size: 15px;
+                    color: #4b5563;
+                  "
+                >
+                  {{ item.quantity|default:1 }}
+                </td>
+                <td
+                  style="
+                    padding: 16px;
+                    text-align: right;
+                    font-size: 15px;
+                    color: #4b5563;
+                  "
+                >
+                  {{ item.unit_price|default:0 }} {{ currency }}
+                </td>
+                <td
+                  style="
+                    padding: 16px;
+                    text-align: right;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #111827;
+                  "
+                >
+                  {{ item.line_total|default:0 }} {{ currency }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td
+                  colspan="3"
+                  style="padding: 20px 16px; text-align: right; font-size: 16px; font-weight: 700; color: #374151;"
+                >
+                  Grand Total
+                </td>
+                <td
+                  style="
+                    padding: 20px 16px;
+                    text-align: right;
+                    font-size: 18px;
+                    font-weight: 800;
+                    color: #2d4685;
+                  "
+                >
+                  {{ total_amount }} {{ currency }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style="margin-top: 40px; text-align: center;">
+            <a
+              href="{{ dashboard_link }}"
+              style="
+                display: inline-block;
+                padding: 16px 32px;
+                background: #2d4685;
+                color: #ffffff;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: 700;
+                font-size: 15px;
+                letter-spacing: 0.02em;
+              "
+              >View & Accept Quote in Dashboard</a
+            >
+          </div>
+          <p style="margin-top: 32px; color: #9ca3af; font-size: 13px; text-align: center; line-height: 1.6;">
+            Please note that availability and pricing are subject to change until confirmed.
+            <br>© 2026 Vizit Africa Logistics.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -7,6 +7,7 @@ class Payment(models.Model):
         ('pending', 'Pending'),
         ('succeeded', 'Succeeded'),
         ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
         ('cancelled', 'Cancelled'),
     ]
     
@@ -18,6 +19,7 @@ class Payment(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     payment_method = models.CharField(max_length=50, blank=True)
     transaction_id = models.CharField(max_length=100, unique=True, blank=True)
+    refund_id = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

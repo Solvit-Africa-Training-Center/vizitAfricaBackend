@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <body
+    style="font-family: Arial, sans-serif; background: #f8f9fa; padding: 24px"
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="
+        max-width: 620px;
+        margin: 0 auto;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+      "
+    >
+      <tr>
+        <td style="padding: 24px">
+          <h2 style="margin: 0 0 12px 0; color: #111827">
+            Payment Received
+          </h2>
+          
+          <p style="color: #374151; margin-bottom: 16px">
+            A payment has been successfully processed for booking
+            <strong>{{ booking_id }}</strong>.
+          </p>
+
+          <div style="
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 16px;
+            margin-bottom: 24px;
+          ">
+            <p style="margin: 0 0 8px 0; color: #065f46; font-weight: bold">
+              Amount Received
+            </p>
+            <p style="margin: 0; font-size: 20px; font-weight: bold; color: #10b981">
+              {{ currency }} {{ amount|floatformat:2 }}
+            </p>
+          </div>
+
+          <div style="
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 24px;
+          ">
+            <p style="margin: 0 0 12px 0; color: #111827; font-weight: bold">
+              Payment Details
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px">
+              <tr>
+                <td style="color: #6b7280; padding: 6px 0">Booking ID:</td>
+                <td style="color: #111827; font-weight: bold; padding: 6px 0; text-align: right">
+                  {{ booking_id }}
+                </td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 6px 0">Guest Name:</td>
+                <td style="color: #111827; font-weight: bold; padding: 6px 0; text-align: right">
+                  {{ guest_name }}
+                </td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 6px 0">Guest Email:</td>
+                <td style="color: #111827; font-weight: bold; padding: 6px 0; text-align: right">
+                  {{ guest_email }}
+                </td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 6px 0">Payment Reference:</td>
+                <td style="color: #111827; font-weight: bold; padding: 6px 0; text-align: right">
+                  {{ payment_reference }}
+                </td>
+              </tr>
+              <tr>
+                <td style="color: #6b7280; padding: 6px 0">Date & Time:</td>
+                <td style="color: #111827; font-weight: bold; padding: 6px 0; text-align: right">
+                  {{ payment_date|date:"M d, Y H:i e" }}
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            padding: 16px;
+            border-radius: 6px;
+          ">
+            <p style="margin: 0; color: #92400e">
+              <strong>Action Required:</strong> Send confirmation email to guest and
+              proceed with itinerary preparation.
+            </p>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
